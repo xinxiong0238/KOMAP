@@ -1,0 +1,21 @@
+Package: KOMAP
+Type: Package
+Title: Knowledge-Driven Online Multimodal Automated Phenotyping System (KOMAP) 
+Version: 0.1.0
+Author: Xin Xiong
+Maintainer: Xin Xiong <xinxiong@hsph.harvard.edu>
+Description: Fit an unsupervised phenotyping system which does not require manual chart review to acquire gold standard labels for algorithm training and validation. The online algorithm only requires summary-level covariance matrix for coefficient training. To get a quick model evaluation without individual-level data, users can upload conditional mean vector and covariance matrix to obtain a simulated AUC. Can deal with cases when both codified and NLP features are available, or when only one feature type is at hand.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 2.10)
+Imports: 
+    dplyr,
+    data.table,
+    glmnet,
+    stringr,
+    stats,
+    magrittr,
+    MASS
+RoxygenNote: 7.1.2
