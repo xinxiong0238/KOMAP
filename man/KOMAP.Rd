@@ -15,17 +15,17 @@ KOMAP(
   pred = FALSE,
   eval.real = FALSE,
   eval.sim = TRUE,
-  mu0,
-  mu1,
-  var0,
-  var1,
-  prev_Y,
+  mu0 = NULL,
+  mu1 = NULL,
+  var0 = NULL,
+  var1 = NULL,
+  prev_Y = NULL,
   B = 10000,
-  dat.part,
-  nm.id,
-  gold.label,
-  nm.pi,
-  nm.y
+  dat.part = NULL,
+  nm.id = NULL,
+  gold.label = NULL,
+  nm.pi = NULL,
+  nm.y = NULL
 )
 }
 \arguments{
