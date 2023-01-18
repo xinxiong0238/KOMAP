@@ -9,7 +9,7 @@ node_format_check <- function(target.code, target.cui, input.cov, codify.feature
   }
 
   nm.feat.all = sort(colnames(feat.cov))
-  if(! nm.utl %in% nm.feat.all){
+  if(!all(nm.utl %in% nm.feat.all)){
     stop('The utl variable does not exist in your input covariance matrix!')
   }
   select.feat = c(codify.feature, cuisearch.feature)
@@ -164,7 +164,7 @@ KOMAP.pred.check <- function(out, feat.out, dat.part, nm.utl, nm.id){
   if(any(is.null(dat.part), is.null(nm.id))){
     stop('You must provide individual data and its id column name (dat.part and nm.id argument) to get score prediction!')
   }
-  if(!nm.utl %in% colnames(dat.part)){
+  if(!all(nm.utl %in% colnames(dat.part))){
     stop('The health utility variable does not exist in `dat.part`!')
   }
   if(!nm.id %in% colnames(dat.part)){
