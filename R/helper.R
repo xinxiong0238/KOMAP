@@ -241,7 +241,7 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, target.code, target.cui, dict
       # b.all.ori <- solve(XTX + W) %*% XTY
       score = U_new %*% b.all
       n_komap = length(setdiff(feat, target))
-      alpha_ma = cbind(c(1, rep(0, n_komap), -alpha[1]),
+      alpha_ma = cbind(c(1, rep(0, n_komap), -alpha),
                        rbind(matrix(0, 1, n_komap + 1),
                              diag(1, nrow = n_komap + 1)))
 
@@ -294,8 +294,8 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, target.code, target.cui, dict
 
 
       n_komap = length(setdiff(feat, target))
-      alpha_ma = cbind(c(1, 0, rep(0, n_komap), -alpha[1, 1]),
-                       c(0, 1, rep(0, n_komap), -alpha[1, 2]),
+      alpha_ma = cbind(c(1, 0, rep(0, n_komap), -alpha[, 1]),
+                       c(0, 1, rep(0, n_komap), -alpha[, 2]),
                        rbind(matrix(0, 2, n_komap + 1),
                              diag(1, nrow = n_komap + 1)))
 
