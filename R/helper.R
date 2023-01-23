@@ -37,7 +37,7 @@
 #'                    codify.feature, cuisearch.feature,
 #'                    pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
 #'                    mu0, mu1, var0, var1, prev_Y, B = 10000,
-#'                    dat.part, nm.id, gold.label, nm.pi, nm.y)
+#'                    dat_part, nm.id, gold_label, nm.pi, nm.y)
 #' @export
 KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
                   codify.feature, cuisearch.feature,
