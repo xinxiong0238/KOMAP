@@ -31,7 +31,7 @@ devtools::install_github("xinxiong0238/KOMAP")
 
 ## Example
 
-This is a basic example of how to use the main function in the KOMAP package to perform model training, score prediction and model evaluation with built-in toy rheumatoid arthritis data:
+This is a basic example of how to use the main function in the KOMAP package to perform model training, score prediction and model evaluation with built-in toy rheumatoid arthritis data. To do phenotyping on other diseases, you should specify the related codified features and/or NLP features either with prior knowledge or with ONCE searching results (https://shiny.parse-health.org/CUIsearch-dev/). The csv file you downloaded from ONCE app has the same format as `codify_RA` (or `cui_RA`) stored in the KOMAP pacakge.
 
 ```{r example}
 library(KOMAP)
@@ -44,9 +44,9 @@ nm.utl <- 'utl'
 nm.pi <- 'pi'
 nm.id <- 'patient_num'
 nm.y <- 'Y'
-out <- KOMAP(input.cov, target.code, target.cui, nm.utl, dict,
+out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, cuisearch.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
              mu0, mu1, var0, var1, prev_Y, B = 10000,
-             dat.part, nm.id, gold.label, nm.pi, nm.y)
+             dat_part, nm.id, gold_label, nm.pi, nm.y)
 ```
