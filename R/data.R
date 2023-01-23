@@ -67,8 +67,8 @@ NULL
 #'
 #' @docType data
 #' @keywords datasets
-#' @name dict
-#' @usage data(dict)
+#' @name dict_RA
+#' @usage data(dict_RA)
 #' @format A data frame with 52 rows and 2 variables
 NULL
 
@@ -85,8 +85,8 @@ NULL
 #'
 #' @docType data
 #' @keywords datasets
-#' @name dat.part
-#' @usage data(dat.part)
+#' @name dat_part
+#' @usage data(dat_part)
 #' @format A data frame with 153 rows and 54 variables
 NULL
 
@@ -104,8 +104,8 @@ NULL
 #'
 #' @docType data
 #' @keywords datasets
-#' @name gold.label
-#' @usage data(gold.label)
+#' @name gold_label
+#' @usage data(gold_label)
 #' @format A data frame with 153 rows and 3 variables
 NULL
 
