@@ -53,9 +53,9 @@ package to perform model training, score prediction and model evaluation
 with built-in toy rheumatoid arthritis data. To do phenotyping on other
 diseases, you should specify the related codified features and/or NLP
 features either with prior knowledge or with ONCE searching results
-(<https://shiny.parse-health.org/CUIsearch-dev/>). The csv file you
-downloaded from ONCE app has the same format as `codify_RA` (or
-`cui_RA`) stored in the KOMAP pacakge.
+(<https://shiny.parse-health.org/ONCE/>). The csv file you downloaded
+from ONCE app has the same format as `codify_RA` (or `cui_RA`) stored in
+the KOMAP pacakge.
 
 ``` r
 library(KOMAP)
