@@ -33,6 +33,7 @@ devtools::install_github("xinxiong0238/KOMAP")
 To illustrate the requirement for input data format, users can refer to the toy examples stored in the package.
 
 ```{r}
+library(KOMAP)
 ## Input covariance matrix
 ?cov_RA
 
