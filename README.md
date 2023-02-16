@@ -48,11 +48,39 @@ nm.utl <- 'utl'
 nm.pi <- 'pi'
 nm.id <- 'patient_num'
 nm.y <- 'Y'
-out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+dat.part <- dat_part
+gold.label <- gold_label
+
+## Only fit the model without any validation
+out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+#> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
+#> Num of total feat: 53
+#> Num of selected codify feat: 19
+#> Num of selected codify feat after intersection: 16
+#> Num of selected NLP feat: 20
+#> Num of selected NLP feat after intersection: 16
+#> 
+#> More detailed info...
+#> Num of PheCode in input.cov: 8
+#> Num of PheCode in codify.feature: 7
+#> Num of CCS in input.cov: 0
+#> Num of CCS in codify.feature: 0
+#> Num of LOINC in input.cov: 2
+#> Num of LOINC in codify.feature: 0
+#> Num of RXNORM in input.cov: 17
+#> Num of RXNORM in codify.feature: 12
+#> Num of CUI in input.cov: 25
+#> Num of CUI in cuisearch.feature: 20
+#> 
+#> Finish estimating coefficients.
+
+## Fit the model and calculate simulated AUC
+out_2 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, cuisearch.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-             mu0, mu1, var0, var1, prev_Y, B = 10000,
-             dat_part, nm.id, gold_label, nm.pi, nm.y)
+             mu0, mu1, var0, var1, prev_Y, B = 10000)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
 #> Num of total feat: 53
 #> Num of selected codify feat: 19
@@ -74,4 +102,60 @@ out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_R
 #> 
 #> Finish estimating coefficients.
 #> Finish estimating AUC.
+
+## If individual data is provided, KOMAP can perform disease score prediction
+out_3 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
+             dat.part = dat.part, nm.id = nm.id)
+#> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
+#> Num of total feat: 53
+#> Num of selected codify feat: 19
+#> Num of selected codify feat after intersection: 16
+#> Num of selected NLP feat: 20
+#> Num of selected NLP feat after intersection: 16
+#> 
+#> More detailed info...
+#> Num of PheCode in input.cov: 8
+#> Num of PheCode in codify.feature: 7
+#> Num of CCS in input.cov: 0
+#> Num of CCS in codify.feature: 0
+#> Num of LOINC in input.cov: 2
+#> Num of LOINC in codify.feature: 0
+#> Num of RXNORM in input.cov: 17
+#> Num of RXNORM in codify.feature: 12
+#> Num of CUI in input.cov: 25
+#> Num of CUI in cuisearch.feature: 20
+#> 
+#> Finish estimating coefficients.
+#> Finish predicting scores.
+
+## If individual data and gold label are provided, KOMAP can perform disease score prediction and calculate the true AUC
+out_4 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
+             dat.part = dat.part, nm.id = nm.id, 
+             gold.label = gold.label, nm.pi = nm.pi, nm.y = nm.y)
+#> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
+#> Num of total feat: 53
+#> Num of selected codify feat: 19
+#> Num of selected codify feat after intersection: 16
+#> Num of selected NLP feat: 20
+#> Num of selected NLP feat after intersection: 16
+#> 
+#> More detailed info...
+#> Num of PheCode in input.cov: 8
+#> Num of PheCode in codify.feature: 7
+#> Num of CCS in input.cov: 0
+#> Num of CCS in codify.feature: 0
+#> Num of LOINC in input.cov: 2
+#> Num of LOINC in codify.feature: 0
+#> Num of RXNORM in input.cov: 17
+#> Num of RXNORM in codify.feature: 12
+#> Num of CUI in input.cov: 25
+#> Num of CUI in cuisearch.feature: 20
+#> 
+#> Finish estimating coefficients.
+#> Finish predicting scores.
+#> Finish evaluating model prediction.
 ```

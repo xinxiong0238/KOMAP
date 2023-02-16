@@ -44,9 +44,30 @@ nm.utl <- 'utl'
 nm.pi <- 'pi'
 nm.id <- 'patient_num'
 nm.y <- 'Y'
-out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+dat.part <- dat_part
+gold.label <- gold_label
+
+## Only fit the model without any validation
+out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+
+## Fit the model and calculate simulated AUC
+out_2 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, cuisearch.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-             mu0, mu1, var0, var1, prev_Y, B = 10000,
-             dat_part, nm.id, gold_label, nm.pi, nm.y)
+             mu0, mu1, var0, var1, prev_Y, B = 10000)
+
+## If individual data is provided, KOMAP can perform disease score prediction
+out_3 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
+             dat.part = dat.part, nm.id = nm.id)
+
+## If individual data and gold label are provided, KOMAP can perform disease score prediction and calculate the true AUC
+out_4 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             codify.feature, cuisearch.feature,               
+             pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
+             dat.part = dat.part, nm.id = nm.id, 
+             gold.label = gold.label, nm.pi = nm.pi, nm.y = nm.y)
 ```
