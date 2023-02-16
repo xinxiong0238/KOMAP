@@ -26,7 +26,34 @@ You can install the development version of KOMAP from
 devtools::install_github("xinxiong0238/KOMAP")
 ```
 
-## Example
+## Toy Example for Input data
+
+To illustrate the requirement for input data format, users can refer to
+the toy examples stored in the package.
+
+``` r
+## Input covariance matrix
+?cov_RA
+#> No documentation for 'cov_RA' in specified packages and libraries:
+#> you could try '??cov_RA'
+
+## Input dictionary (can be NULL)
+?dict_RA
+#> No documentation for 'dict_RA' in specified packages and libraries:
+#> you could try '??dict_RA'
+
+## Input individual data to predict disease score (can be NULL)
+?dat_part
+#> No documentation for 'dat_part' in specified packages and libraries:
+#> you could try '??dat_part'
+
+## Input gold label to generate real AUC (can be NULL)
+?gold_label
+#> No documentation for 'gold_label' in specified packages and libraries:
+#> you could try '??gold_label'
+```
+
+## Phenotyping Example
 
 This is a basic example of how to use the main function in the KOMAP
 package to perform model training, score prediction and model evaluation
