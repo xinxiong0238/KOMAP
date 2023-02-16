@@ -51,6 +51,12 @@ nm.y <- 'Y'
 dat.part <- dat_part
 gold.label <- gold_label
 
+## Only fit the model without any validation and without feature screening
+out_0 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+#> 
+#> Finish estimating coefficients.
+
 ## Only fit the model without any validation
 out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, cuisearch.feature,               
