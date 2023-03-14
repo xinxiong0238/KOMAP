@@ -26,7 +26,219 @@ You can install the development version of KOMAP from
 devtools::install_github("xinxiong0238/KOMAP")
 ```
 
-## Toy Example for Input data
+## Dara preprocessing
+
+### Input covariance matrix
+
+One of the KOMAP algorithm inputs is the covariance matrix of the
+clinical features (i.e., log(count+1)) derived from your target
+population. To obtain the covariance matrix, we start from the raw EHR
+records. Note in the stored fake ehr data, we only include 5 patients
+and 2 different ehr codes - lab code and diagnostic ICD code
+(DIAG-ICD9).
+
+``` r
+library(KOMAP)
+head(fake_ehr)
+#>   patient_num days_since_admission concept_type concept_code       value
+#> 1          10                    1    DIAG-ICD9          285 -999.000000
+#> 2          10                    1    DIAG-ICD9          599 -999.000000
+#> 3          10                    1    LAB-LOINC       6690-2    9.624889
+#> 4          10                    1    LAB-LOINC       6690-2    2.356438
+#> 5          10                    1    LAB-LOINC       2532-0  315.036167
+#> 6          10                    1    LAB-LOINC       2160-0    3.633457
+```
+
+We need to first calculate the raw concept count once per day for each
+patient(i.e., for those raw codes that show up more than one time in a
+day, treat as one time):
+
+``` r
+library(dplyr)
+fake_ehr_raw_count = fake_ehr %>% 
+  group_by(patient_num, concept_type, concept_code) %>%
+  summarise(count_once_per_day = length(unique(days_since_admission)))
+head(fake_ehr_raw_count)
+#> # A tibble: 6 × 4
+#> # Groups:   patient_num, concept_type [1]
+#>   patient_num concept_type concept_code count_once_per_day
+#>         <int> <chr>        <chr>                     <int>
+#> 1          10 DIAG-ICD9    285                           1
+#> 2          10 DIAG-ICD9    296                           1
+#> 3          10 DIAG-ICD9    394                           1
+#> 4          10 DIAG-ICD9    402                           1
+#> 5          10 DIAG-ICD9    440                           1
+#> 6          10 DIAG-ICD9    480                           1
+```
+
+Then for diagnostic ICD code, we need to roll them up to phecode level.
+An toy example of the mapping file is stored in the package:
+
+``` r
+head(phecode_map)
+#>   ICD910 concept_code       Phecode                    Description
+#> 1   ICD9          079   PheCode:079                Viral infection
+#> 2   ICD9          112   PheCode:112                    Candidiasis
+#> 3   ICD9          153   PheCode:153              Colorectal cancer
+#> 4   ICD9          153 PheCode:153.2                   Colon cancer
+#> 5   ICD9          250   PheCode:250              Diabetes mellitus
+#> 6   ICD9          272   PheCode:272 Disorders of lipoid metabolism
+```
+
+For each patient, the phecode count is equal to the sum of all its
+descendant ICD code once-per-day count:
+
+``` r
+fake_ehr_rollup_count_phecode = left_join(fake_ehr_raw_count %>% 
+                                            filter(concept_type == 'DIAG-ICD9'), phecode_map)
+#> Joining, by = "concept_code"
+fake_ehr_rollup_count_phecode = fake_ehr_rollup_count_phecode %>%
+  group_by(patient_num, concept_type, Phecode) %>%
+  summarise(count = sum(count_once_per_day)) %>%
+  mutate(concept_code = Phecode) %>%
+  select(!Phecode)
+#> `summarise()` has grouped output by 'patient_num', 'concept_type'. You can override using the `.groups` argument.
+```
+
+Then, we combine the rolled up phecode count and raw loinc count
+together:
+
+``` r
+fake_ehr_count_loinc = fake_ehr_raw_count %>% filter(concept_type == 'LAB-LOINC') %>%
+  mutate(count = count_once_per_day,
+         concept_code = paste0('LOINC:', concept_code)) %>%
+  select(!count_once_per_day)
+fake_ehr_count = rbind(fake_ehr_count_loinc, fake_ehr_rollup_count_phecode)
+head(fake_ehr_count)
+#> # A tibble: 6 × 4
+#> # Groups:   patient_num, concept_type [1]
+#>   patient_num concept_type concept_code count
+#>         <int> <chr>        <chr>        <int>
+#> 1          10 LAB-LOINC    LOINC:1742-6     1
+#> 2          10 LAB-LOINC    LOINC:1920-8     4
+#> 3          10 LAB-LOINC    LOINC:1975-2     2
+#> 4          10 LAB-LOINC    LOINC:1988-5     3
+#> 5          10 LAB-LOINC    LOINC:2160-0     7
+#> 6          10 LAB-LOINC    LOINC:2276-4     1
+```
+
+Then we transform the data to the wide format, conduct logarithm
+transformation, and calculate the covariance matrix:
+
+``` r
+fake_ehr_count_wide = tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_num'),
+                                         names_from = 'concept_code', values_from = 'count')
+fake_ehr_count_wide[is.na(fake_ehr_count_wide)] = 0
+fake_ehr_logcount_wide = fake_ehr_count_wide
+fake_ehr_logcount_wide[,-1] = log(fake_ehr_logcount_wide[, -1] + 1)
+fake_ehr_cov = cov(fake_ehr_logcount_wide[, -1])
+fake_ehr_cov[1:3,1:3]
+#>              LOINC:1742-6 LOINC:1920-8 LOINC:1975-2
+#> LOINC:1742-6   0.41764272  -0.04620953  -0.15587476
+#> LOINC:1920-8  -0.04620953   0.11930231   0.08004193
+#> LOINC:1975-2  -0.15587476   0.08004193   0.34109280
+```
+
+Note that it may be beneficial to screen out patients who never have the
+diagnostic code of your target disease before calculating the covariance
+matrix. For example, if you are interesting in rheumatoid arthritis
+phenotyping task, it is suggested to focus on patients who had at least
+1 count of `PheCode:714.1` in their EHR records.
+
+Also,
+
+### Input feature filters (optional)
+
+To further filter out unrelated codes, you can specify a vector of
+codified features as well as a vector of NLP features (e.g., CUIs in the
+stored example). You can refer to
+[ONCE](https://shiny.parse-health.org/ONCE/), an online searching app
+that returns a dictionary of related codified features as well as NLP
+features based on knowledge extracted from online article corpus. The
+csv file you downloaded from ONCE app has the same format as `codify_RA`
+(or `cui_RA`) stored in the KOMAP pacakge.
+
+``` r
+codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
+head(codify.feature)
+#> [1] "PheCode:714.1" "PheCode:714"   "RXNORM:614391" "RXNORM:214555"
+#> [5] "RXNORM:6851"   "RXNORM:27169"
+nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
+head(nlp.feature)
+#> [1] "C0003873" "C0035450" "C0242708" "C0063041" "C0409651" "C0717758"
+```
+
+If `codify.feature` or `nlp.feature` argument is not equal to NULL, then
+KOMAP will only take a subset of the covariance matrix corresponding to
+your input. You can also do the filtering on the input covariance matrix
+by yourself.
+
+### Input conditional covariance matrix, conditional mean vector and prevalance (optional)
+
+If you have some labeled data at hand and you want to quickly check
+KOMAP performance, this package provides a simulated AUC that only needs
+conditional covariance matrix, conditional mean vector and prevalence
+without any individual data. To generate such AUC, we start from
+`fake_ehr_label_logcount_wide` which was generated by the aforementioned
+process using another set of fake patients. The format is very similar
+to `fake_ehr_logcount_wide`, except that `fake_ehr_label_logcount_wide`
+has an additional column indicating the true label for each patient.
+
+``` r
+fake_ehr_label_logcount_wide[1:3,1:5]
+#> # A tibble: 3 × 5
+#>       Y patient_num `LOINC:1742-6` `LOINC:1751-7` `LOINC:1920-8`
+#>   <dbl>       <int>          <dbl>          <dbl>          <dbl>
+#> 1     1          19           1.10          0.693           1.79
+#> 2     0         161           1.61          0.693           1.10
+#> 3     0         179           1.79          0               1.10
+```
+
+The conditional statistics are derived based on this label column.
+
+``` r
+fake_ehr_var0 = cov(fake_ehr_label_logcount_wide %>% filter(Y == 0) %>% select(-c(Y, patient_num)))
+fake_ehr_var1 = cov(fake_ehr_label_logcount_wide %>% filter(Y == 1) %>% select(-c(Y, patient_num)))
+fake_ehr_mu0 = colMeans(fake_ehr_label_logcount_wide %>% filter(Y == 0) %>% select(-c(Y, patient_num)))
+fake_ehr_mu1 = colMeans(fake_ehr_label_logcount_wide %>% filter(Y == 1) %>% select(-c(Y, patient_num)))
+fake_ehr_prev = mean(fake_ehr_label_logcount_wide$Y)
+```
+
+Note that the two conditional matrices must have colnames and rownames,
+and the conditional mean vectors must have names.
+
+### Input gold label individual data (optional)
+
+If you want to obtain the accurate AUC value by providing individual
+count data, the input gold label data should have the format as
+`fake_ehr_label_count_wide` with one column indicating patient labels
+(the column nae should go to the `nm.y` argument). Additionally, you can
+have another column suggesting the sample probability (the column nae
+should go to the `nm.pi` argument) if each patient in the label data was
+sampled with unequal probability.
+
+``` r
+fake_ehr_label_logcount_wide_pi[1:3,1:6]
+#>    pi Y patient_num LOINC:1742-6 LOINC:1751-7 LOINC:1920-8
+#> 1 0.3 1          19     1.098612    0.6931472     1.791759
+#> 2 0.7 0         161     1.609438    0.6931472     1.098612
+#> 3 0.4 0         179     1.791759    0.0000000     1.098612
+```
+
+### Input individual data for disease score prediction (optional)
+
+If you have some unlabeled data and want to use KOMAP to perform disease
+score prediction, the input data should be similar to
+`fake_ehr_logcount_wide`. If only part of your individual data has
+labels (i.e., some patients have NA value on the `Y` column), KOMAP can
+still perform prediction by ignoring the `Y` column. You also need to
+assign the unique patient id to a column (i.e, `nm.id` argument) for
+your input individual data, so that the output prediction data frame
+will also have that column in case of mismatching issue.
+
+## Toy example for how use stored input data
+
+### Stored input data for phenotyping
 
 To illustrate the requirement for input data format, users can refer to
 the toy examples stored in the package.
@@ -39,28 +251,24 @@ library(KOMAP)
 ## Input dictionary (can be NULL)
 ?dict_RA
 
-## Input individual data to predict disease score (can be NULL)
+## Input individual data to predict disease score and/or evaluate model performance (can be NULL)
 ?dat_part
-
-## Input gold label to generate real AUC (can be NULL)
-?gold_label
 ```
 
-## Phenotyping Example
+### Phenotyping Example
 
 This is a basic example of how to use the main function in the KOMAP
 package to perform model training, score prediction and model evaluation
-with built-in toy rheumatoid arthritis data. To do phenotyping on other
-diseases, you should specify the related codified features and/or NLP
-features either with prior knowledge or with ONCE searching results
-(<https://shiny.parse-health.org/ONCE/>). The csv file you downloaded
-from ONCE app has the same format as `codify_RA` (or `cui_RA`) stored in
-the KOMAP pacakge.
+with built-in toy rheumatoid arthritis data. Note that to do phenotyping
+on other diseases, you should specify the related codified features
+and/or NLP features either with prior knowledge or with ONCE searching
+results (<https://shiny.parse-health.org/ONCE/>). The csv file you
+downloaded from ONCE app has the same format as `codify_RA` (or
+`cui_RA`) stored in the KOMAP pacakge.
 
 ``` r
-library(KOMAP)
-codify.feature <- codify_RA$Variable[codify_RA$select == 1]
-cuisearch.feature <- cui_RA$cui[cui_RA$select == 1]
+codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
+nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
 input.cov <- cov_RA
 target.code <- 'PheCode:714.1'
 target.cui <- 'C0003873'
@@ -69,7 +277,6 @@ nm.pi <- 'pi'
 nm.id <- 'patient_num'
 nm.y <- 'Y'
 dat.part <- dat_part
-gold.label <- gold_label
 
 ## Only fit the model without any validation and without feature screening
 out_0 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
@@ -79,107 +286,106 @@ out_0 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict
 
 ## Only fit the model without any validation
 out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, cuisearch.feature,               
+             codify.feature, nlp.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 53
-#> Num of selected codify feat: 19
-#> Num of selected codify feat after intersection: 16
-#> Num of selected NLP feat: 20
-#> Num of selected NLP feat after intersection: 16
+#> Num of total feat: 184
+#> Num of selected codify feat: 48
+#> Num of selected codify feat after intersection: 37
+#> Num of selected NLP feat: 71
+#> Num of selected NLP feat after intersection: 48
 #> 
 #> More detailed info...
-#> Num of PheCode in input.cov: 8
-#> Num of PheCode in codify.feature: 7
-#> Num of CCS in input.cov: 0
-#> Num of CCS in codify.feature: 0
-#> Num of LOINC in input.cov: 2
-#> Num of LOINC in codify.feature: 0
-#> Num of RXNORM in input.cov: 17
-#> Num of RXNORM in codify.feature: 12
-#> Num of CUI in input.cov: 25
-#> Num of CUI in cuisearch.feature: 20
+#> Num of PheCode in input.cov: 41
+#> Num of PheCode in codify.feature: 19
+#> Num of CCS in input.cov: 4
+#> Num of CCS in codify.feature: 1
+#> Num of LOINC in input.cov: 17
+#> Num of LOINC in codify.feature: 6
+#> Num of RXNORM in input.cov: 40
+#> Num of RXNORM in codify.feature: 18
+#> Num of CUI in input.cov: 81
+#> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
 
 ## Fit the model and calculate simulated AUC
 out_2 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, cuisearch.feature,               
+             codify.feature, nlp.feature,                            
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
              mu0, mu1, var0, var1, prev_Y, B = 10000)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 53
-#> Num of selected codify feat: 19
-#> Num of selected codify feat after intersection: 16
-#> Num of selected NLP feat: 20
-#> Num of selected NLP feat after intersection: 16
+#> Num of total feat: 184
+#> Num of selected codify feat: 48
+#> Num of selected codify feat after intersection: 37
+#> Num of selected NLP feat: 71
+#> Num of selected NLP feat after intersection: 48
 #> 
 #> More detailed info...
-#> Num of PheCode in input.cov: 8
-#> Num of PheCode in codify.feature: 7
-#> Num of CCS in input.cov: 0
-#> Num of CCS in codify.feature: 0
-#> Num of LOINC in input.cov: 2
-#> Num of LOINC in codify.feature: 0
-#> Num of RXNORM in input.cov: 17
-#> Num of RXNORM in codify.feature: 12
-#> Num of CUI in input.cov: 25
-#> Num of CUI in cuisearch.feature: 20
+#> Num of PheCode in input.cov: 41
+#> Num of PheCode in codify.feature: 19
+#> Num of CCS in input.cov: 4
+#> Num of CCS in codify.feature: 1
+#> Num of LOINC in input.cov: 17
+#> Num of LOINC in codify.feature: 6
+#> Num of RXNORM in input.cov: 40
+#> Num of RXNORM in codify.feature: 18
+#> Num of CUI in input.cov: 81
+#> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
 #> Finish estimating AUC.
 
 ## If individual data is provided, KOMAP can perform disease score prediction
 out_3 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, cuisearch.feature,               
+             codify.feature, nlp.feature,                          
              pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
              dat.part = dat.part, nm.id = nm.id)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 53
-#> Num of selected codify feat: 19
-#> Num of selected codify feat after intersection: 16
-#> Num of selected NLP feat: 20
-#> Num of selected NLP feat after intersection: 16
+#> Num of total feat: 184
+#> Num of selected codify feat: 48
+#> Num of selected codify feat after intersection: 37
+#> Num of selected NLP feat: 71
+#> Num of selected NLP feat after intersection: 48
 #> 
 #> More detailed info...
-#> Num of PheCode in input.cov: 8
-#> Num of PheCode in codify.feature: 7
-#> Num of CCS in input.cov: 0
-#> Num of CCS in codify.feature: 0
-#> Num of LOINC in input.cov: 2
-#> Num of LOINC in codify.feature: 0
-#> Num of RXNORM in input.cov: 17
-#> Num of RXNORM in codify.feature: 12
-#> Num of CUI in input.cov: 25
-#> Num of CUI in cuisearch.feature: 20
+#> Num of PheCode in input.cov: 41
+#> Num of PheCode in codify.feature: 19
+#> Num of CCS in input.cov: 4
+#> Num of CCS in codify.feature: 1
+#> Num of LOINC in input.cov: 17
+#> Num of LOINC in codify.feature: 6
+#> Num of RXNORM in input.cov: 40
+#> Num of RXNORM in codify.feature: 18
+#> Num of CUI in input.cov: 81
+#> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
 #> Finish predicting scores.
 
 ## If individual data and gold label are provided, KOMAP can perform disease score prediction and calculate the true AUC
 out_4 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, cuisearch.feature,               
+             codify.feature, nlp.feature,                           
              pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
-             dat.part = dat.part, nm.id = nm.id, 
-             gold.label = gold.label, nm.pi = nm.pi, nm.y = nm.y)
+             dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 53
-#> Num of selected codify feat: 19
-#> Num of selected codify feat after intersection: 16
-#> Num of selected NLP feat: 20
-#> Num of selected NLP feat after intersection: 16
+#> Num of total feat: 184
+#> Num of selected codify feat: 48
+#> Num of selected codify feat after intersection: 37
+#> Num of selected NLP feat: 71
+#> Num of selected NLP feat after intersection: 48
 #> 
 #> More detailed info...
-#> Num of PheCode in input.cov: 8
-#> Num of PheCode in codify.feature: 7
-#> Num of CCS in input.cov: 0
-#> Num of CCS in codify.feature: 0
-#> Num of LOINC in input.cov: 2
-#> Num of LOINC in codify.feature: 0
-#> Num of RXNORM in input.cov: 17
-#> Num of RXNORM in codify.feature: 12
-#> Num of CUI in input.cov: 25
-#> Num of CUI in cuisearch.feature: 20
+#> Num of PheCode in input.cov: 41
+#> Num of PheCode in codify.feature: 19
+#> Num of CCS in input.cov: 4
+#> Num of CCS in codify.feature: 1
+#> Num of LOINC in input.cov: 17
+#> Num of LOINC in codify.feature: 6
+#> Num of RXNORM in input.cov: 40
+#> Num of RXNORM in codify.feature: 18
+#> Num of CUI in input.cov: 81
+#> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
 #> Finish predicting scores.
