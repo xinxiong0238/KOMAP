@@ -257,12 +257,7 @@ library(KOMAP)
 
 This is a basic example of how to use the main function in the KOMAP
 package to perform model training, score prediction and model evaluation
-with built-in toy rheumatoid arthritis data. Note that to do phenotyping
-on other diseases, you should specify the related codified features
-and/or NLP features either with prior knowledge or with ONCE searching
-results (<https://shiny.parse-health.org/ONCE/>). The csv file you
-downloaded from ONCE app has the same format as `codify_RA` (or
-`cui_RA`) stored in the KOMAP pacakge.
+with built-in toy rheumatoid arthritis data.
 
 ``` r
 codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
