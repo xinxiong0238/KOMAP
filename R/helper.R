@@ -19,7 +19,6 @@
 #' @param B The number of samples to calculate simulated AUC, given the conditional Gaussian assumption. Default is 10000.
 #' @param dat.part Patient-level data for prediction. Must be provided if \code{pred}=\code{TRUE} or \code{eval.real}.
 #' @param nm.id Name of the patient id column in \code{dat.part} and \code{gold.label}. Must be provided if \code{pred}=\code{TRUE} or \code{eval.real}.
-#' @param gold.label Gold label for patients in \code{dat.part}, containing at least one id column and one label column. Must be provided if \code{eval.real}=\code{TRUE}.
 #' @param nm.pi The column name of sample probability in \code{gold.label} if individuals in \code{gold.label} are generated with different probabilities. Default is \code{NULL}, meaning a uniform sample distribution.
 #' @param nm.y The column name of labels in \code{gold.label}. Must be provided if \code{eval.real}=\code{TRUE}.
 #' @returns A list containing estimation and/or prediction and/or evaluation results by running KOMAP.
@@ -43,7 +42,7 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
                   codify.feature = NULL, cuisearch.feature = NULL,
                   pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
                   mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
-                  dat.part = NULL, nm.id = NULL, gold.label = NULL, nm.pi = NULL, nm.y = NULL){
+                  dat.part = NULL, nm.id = NULL, nm.pi = NULL, nm.y = NULL){
   oldw <- getOption("warn")
   options(warn = -1)
 
@@ -76,6 +75,8 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
 
   if(eval.real){
     if(pred){
+      gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
+      gold.label = na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out.eval = KOMAP.eval(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out_return = c(out_return,
@@ -84,7 +85,8 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
     }else{
       KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
       pred.prob = KOMAP.pred(out, dat.part, nm.utl, nm.multi, nm.id)
-
+      gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
+      gold.label = na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out.eval = KOMAP.eval(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out_return = c(out_return, `pred_prob` = list(pred.prob),
@@ -114,7 +116,7 @@ KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict
   }
 
   if(is.null(codify.feature) & is.null(cuisearch.feature)){
-    cuisearch.feature.new = codify.feature.new = colnames(input.cov)
+    cuisearch.feature.new = codify.feature.new = setdiff(colnames(input.cov), c(nm.utl, nm.multi))
   }else{
     if(is.null(codify.feature)){
       codify.feature.new = target.code
