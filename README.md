@@ -145,8 +145,6 @@ matrix. For example, if you are interesting in rheumatoid arthritis
 phenotyping task, it is suggested to focus on patients who had at least
 1 count of `PheCode:714.1` in their EHR records.
 
-Also,
-
 ### Input feature filters (optional)
 
 To further filter out unrelated codes, you can specify a vector of
