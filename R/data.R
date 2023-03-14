@@ -18,16 +18,15 @@ NULL
 #' \itemize{
 #'   \item Variable. codified feature id (possible categories: PheCode/RXNORM/CCS/LOINC/Other lab)
 #'   \item Description. full feature description
-#'   \item cos. Cosine similarity between the feature and PheCode:714.1.
-#'   \item select. Selected features with \code{cos}> mode(cos) + 2 * median absolute deviation(cos)
-#'   \item ...
+#'   \item relatedness_to_target_disease. Cosine similarity between the feature and PheCode:714.1.
+#'   \item high_confidence_level. Selected features with further screening strategy.
 #' }
 #'
 #' @docType data
 #' @keywords datasets
 #' @name codify_RA
 #' @usage data(codify_RA)
-#' @format A data frame with 78 rows and 10 variables
+#' @format A data frame with 66 rows and 4 variables
 NULL
 
 
@@ -39,19 +38,16 @@ NULL
 #' \itemize{
 #'   \item cui. NLP feature id (possible categories: CUI)
 #'   \item term. full feature description
-#'   \item cos_cui. cosine similarity between the feature and C0003873
-#'   \item article_count. the number of related articles containing the feature
-#'   \item mgb_freq term-level frequency in the MGB patient cohort
-#'   \item Acos_Ccos_d_log_va_plus. Weight combining \code{cos_cui}, \code{article_count} and \code{mgb_freq} showing relatedness between features and C0003873
-#'   \item select. Selected features with \code{Acos_Ccos_d_log_va_plus}> mode(Acos_Ccos_d_log_va_plus) + 2 * median absolute deviation(Acos_Ccos_d_log_va_plus)
-#'   \item ...
+#'   \item relatedness_to_target_disease. cosine similarity between the feature and C0003873
+#'   \item importance_score. Weight combining cosine similarity, article count and term frequency that shows relatedness between features and C0003873
+#'   \item high_confidence_level. Selected features with further screening strategy.
 #' }
 #'
 #' @docType data
 #' @keywords datasets
 #' @name cui_RA
 #' @usage data(cui_RA)
-#' @format A data frame with 1183 rows and 13 variables
+#' @format A data frame with 897 rows and 5 variables
 NULL
 
 
@@ -69,7 +65,7 @@ NULL
 #' @keywords datasets
 #' @name dict_RA
 #' @usage data(dict_RA)
-#' @format A data frame with 52 rows and 2 variables
+#' @format A data frame with 183 rows and 2 variables
 NULL
 
 
@@ -79,6 +75,8 @@ NULL
 #'
 #' \itemize{
 #'   \item patient_num unique patient id (pseudo)
+#'   \item Y gold label (optional)
+#'   \item pi sample probability (optional if uniformly sampled)
 #'   \item utl health utility score
 #'   \item ... Codified and NLP features
 #' }
@@ -87,26 +85,7 @@ NULL
 #' @keywords datasets
 #' @name dat_part
 #' @usage data(dat_part)
-#' @format A data frame with 153 rows and 54 variables
-NULL
-
-
-
-#' Pseudo-individual data with gold label for model evaluation
-#'
-#' A dataframe containing pseudo patient id and pseudo gold label (possibly also sample probability). The variables are as follows:
-#'
-#' \itemize{
-#'   \item patient_num unique patient id (pseudo)
-#'   \item pi sample probability (can be \code{NULL} if uniformly sampled)
-#'   \item Y gold label (pseudo)
-#' }
-#'
-#' @docType data
-#' @keywords datasets
-#' @name gold_label
-#' @usage data(gold_label)
-#' @format A data frame with 153 rows and 3 variables
+#' @format A data frame with 242 rows and 187 variables
 NULL
 
 
@@ -118,7 +97,7 @@ NULL
 #' @keywords datasets
 #' @name mu0
 #' @usage data(mu0)
-#' @format A named vector with 40 entries.
+#' @format A named vector with 184 entries.
 NULL
 
 
@@ -130,7 +109,7 @@ NULL
 #' @keywords datasets
 #' @name mu1
 #' @usage data(mu1)
-#' @format A named vector with 40 entries.
+#' @format A named vector with 184 entries.
 NULL
 
 
@@ -142,7 +121,7 @@ NULL
 #' @keywords datasets
 #' @name var0
 #' @usage data(var0)
-#' @format A 40*40 covariance matrix.
+#' @format A 184*184 covariance matrix.
 NULL
 
 
@@ -154,7 +133,7 @@ NULL
 #' @keywords datasets
 #' @name var1
 #' @usage data(var1)
-#' @format A 40*40 covariance matrix.
+#' @format A 184*184 covariance matrix.
 NULL
 
 
