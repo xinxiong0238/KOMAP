@@ -23,8 +23,8 @@
 #' @param nm.y The column name of labels in \code{gold.label}. Must be provided if \code{eval.real}=\code{TRUE}.
 #' @returns A list containing estimation and/or prediction and/or evaluation results by running KOMAP.
 #' @examples
-#' codify.feature <- codify_RA$Variable[codify_RA$select == 1]
-#' cuisearch.feature <- cui_RA$cui[cui_RA$select == 1]
+#' codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
+#' nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
 #' input.cov <- cov_RA
 #' target.code <- 'PheCode:714.1'
 #' target.cui <- 'C0003873'
@@ -32,11 +32,12 @@
 #' nm.pi <- 'pi'
 #' nm.id <- 'patient_num'
 #' nm.y <- 'Y'
-#' out <- KOMAP(input.cov, target.code, target.cui, nm.utl, dict_RA,
-#'                    codify.feature, cuisearch.feature,
-#'                    pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-#'                    mu0, mu1, var0, var1, prev_Y, B = 10000,
-#'                    dat_part, nm.id, gold_label, nm.pi, nm.y)
+#' dat.part <- dat_part
+#'
+#' out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+#'                codify.feature, nlp.feature,
+#'                pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
+#'                dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #' @export
 KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
                   codify.feature = NULL, nlp.feature = NULL,
@@ -80,7 +81,7 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
   if(eval.real){
     if(pred){
       gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
-      gold.label = na.omit(gold.label)
+      gold.label = stats::na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out.eval = KOMAP.eval(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out_return = c(out_return,
@@ -90,7 +91,7 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
       KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
       pred.prob = KOMAP.pred(out, dat.part, nm.utl, nm.multi, nm.id)
       gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
-      gold.label = na.omit(gold.label)
+      gold.label = stats::na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out.eval = KOMAP.eval(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
       out_return = c(out_return, `pred_prob` = list(pred.prob),
@@ -456,14 +457,14 @@ KOMAP.pred <- function(out, dat.part, nm.utl, nm.multi, nm.id = 'patient_num'){
     pred.prob = cbind(pred.prob, fit)
   }
   colnames(pred.prob)[-1] = names(out)
-  return(na.omit(pred.prob))
+  return(stats::na.omit(pred.prob))
 }
 
 
 
 KOMAP.eval <- function(pred.prob, gold.label, nm.pi = NULL, nm.y = 'Y', nm.id, method_nm){
   dat.merge = dplyr::left_join(gold.label, pred.prob, by = nm.id)
-  dat.merge = na.omit(dat.merge)
+  dat.merge = stats::na.omit(dat.merge)
   Y <- dat.merge[, nm.y]
   auc_table <- c()
   F_table <- c()

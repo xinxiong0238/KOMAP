@@ -5,7 +5,7 @@
 \alias{mu1}
 \title{Conditional feature mean vector (Y=1)}
 \format{
-A named vector with 40 entries.
+A named vector with 184 entries.
 }
 \usage{
 data(mu1)

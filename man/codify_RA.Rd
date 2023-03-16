@@ -5,7 +5,7 @@
 \alias{codify_RA}
 \title{Codified features related to rheumatoid arthritis}
 \format{
-A data frame with 78 rows and 10 variables
+A data frame with 66 rows and 4 variables
 }
 \usage{
 data(codify_RA)
@@ -17,9 +17,8 @@ A dataframe containing codified features related to rheumatoid disease (PheCode:
 \itemize{
   \item Variable. codified feature id (possible categories: PheCode/RXNORM/CCS/LOINC/Other lab)
   \item Description. full feature description
-  \item cos. Cosine similarity between the feature and PheCode:714.1.
-  \item select. Selected features with \code{cos}> mode(cos) + 2 * median absolute deviation(cos)
-  \item ...
+  \item relatedness_to_target_disease. Cosine similarity between the feature and PheCode:714.1.
+  \item high_confidence_level. Selected features with further screening strategy.
 }
 }
 \keyword{datasets}

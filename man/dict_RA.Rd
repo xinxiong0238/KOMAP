@@ -5,7 +5,7 @@
 \alias{dict_RA}
 \title{Dictionary mapping feature id to feature description}
 \format{
-A data frame with 52 rows and 2 variables
+A data frame with 183 rows and 2 variables
 }
 \usage{
 data(dict_RA)

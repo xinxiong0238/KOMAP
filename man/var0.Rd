@@ -5,7 +5,7 @@
 \alias{var0}
 \title{Conditional feature covariance matrix (Y=0)}
 \format{
-A 40*40 covariance matrix.
+A 184*184 covariance matrix.
 }
 \usage{
 data(var0)

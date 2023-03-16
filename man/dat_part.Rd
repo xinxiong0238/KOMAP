@@ -5,7 +5,7 @@
 \alias{dat_part}
 \title{Pseudo-individual data for score prediction and model evaluation}
 \format{
-A data frame with 153 rows and 54 variables
+A data frame with 242 rows and 187 variables
 }
 \usage{
 data(dat_part)
@@ -16,6 +16,8 @@ A dataframe containing pseudo patient id and codified and NLP feature counts (af
 \details{
 \itemize{
   \item patient_num unique patient id (pseudo)
+  \item Y gold label (optional)
+  \item pi sample probability (optional if uniformly sampled)
   \item utl health utility score
   \item ... Codified and NLP features
 }

@@ -69,6 +69,18 @@ NULL
 NULL
 
 
+
+#' Dictionary mapping from ICD9 to Phecode
+#'
+#' A dataframe containing ICD9 and the mapped phecodes for features appearing in \code{fake_ehr}.
+#' @docType data
+#' @keywords datasets
+#' @name phecode_map
+#' @usage data(phecode_map)
+#' @format A data frame with 48 rows and 4 variables
+NULL
+
+
 #' Pseudo-individual data for score prediction and model evaluation
 #'
 #' A dataframe containing pseudo patient id and codified and NLP feature counts (after log transformation). The variables are as follows:
@@ -86,6 +98,85 @@ NULL
 #' @name dat_part
 #' @usage data(dat_part)
 #' @format A data frame with 242 rows and 187 variables
+NULL
+
+
+
+#' Fake EHR data for preprocessing illustration
+#'
+#' A dataframe containing pseudo patient id and longitudinal EHR codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item patient_num unique patient id (fake)
+#'   \item days_since_admission time indicator
+#'   \item concept_type two different EHR code types (`DIAG-ICD9` and `LAB-LOINC`) in this fake data
+#'   \item concept_code EHR code name
+#'   \item value lab values. -999 if the record belongs to `DIAG-ICD9`.
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name fake_ehr
+#' @usage data(fake_ehr)
+#' @format A data frame with 346 rows and 5 variables
+NULL
+
+
+
+#' Fake EHR data for preprocessing illustration
+#'
+#' A dataframe containing pseudo patient id and longitudinal EHR codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item patient_num unique patient id (fake)
+#'   \item days_since_admission time indicator
+#'   \item concept_type two different EHR code types (`DIAG-ICD9` and `LAB-LOINC`) in this fake data
+#'   \item concept_code EHR code name
+#'   \item value lab values. -999 if the record belongs to `DIAG-ICD9`.
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name fake_ehr
+#' @usage data(fake_ehr)
+#' @format A data frame with 346 rows and 5 variables
+NULL
+
+
+#' Fake EHR data in wide format with gold labels
+#'
+#' A dataframe containing pseudo patient id, gold lables and rollup counts for EHR codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item Y gold labels
+#'   \item patient_num unique patient id (fake)
+#'   \item ... EHR code counts
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name fake_ehr_label_logcount_wide
+#' @usage data(fake_ehr_label_logcount_wide)
+#' @format A data frame with 8 rows and 50 variables
+NULL
+
+
+#' Fake EHR data in wide format with gold labels and sample probabilities
+#'
+#' A dataframe containing pseudo patient id, gold lables, sample probabilities and rollup counts for EHR codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item pi sample probability of the patient
+#'   \item Y gold labels
+#'   \item patient_num unique patient id (fake)
+#'   \item ... EHR code counts
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name fake_ehr_label_logcount_wide_pi
+#' @usage data(fake_ehr_label_logcount_wide_pi)
+#' @format A data frame with 8 rows and 51 variables
 NULL
 
 

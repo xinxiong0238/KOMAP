@@ -5,7 +5,7 @@
 \alias{cui_RA}
 \title{NLP features related to rheumatoid arthritis}
 \format{
-A data frame with 1183 rows and 13 variables
+A data frame with 897 rows and 5 variables
 }
 \usage{
 data(cui_RA)
@@ -17,12 +17,9 @@ A dataframe containing NLP features related to rheumatoid disease (C0003873) gen
 \itemize{
   \item cui. NLP feature id (possible categories: CUI)
   \item term. full feature description
-  \item cos_cui. cosine similarity between the feature and C0003873
-  \item article_count. the number of related articles containing the feature
-  \item mgb_freq term-level frequency in the MGB patient cohort
-  \item Acos_Ccos_d_log_va_plus. Weight combining \code{cos_cui}, \code{article_count} and \code{mgb_freq} showing relatedness between features and C0003873
-  \item select. Selected features with \code{Acos_Ccos_d_log_va_plus}> mode(Acos_Ccos_d_log_va_plus) + 2 * median absolute deviation(Acos_Ccos_d_log_va_plus)
-  \item ...
+  \item relatedness_to_target_disease. cosine similarity between the feature and C0003873
+  \item importance_score. Weight combining cosine similarity, article count and term frequency that shows relatedness between features and C0003873
+  \item high_confidence_level. Selected features with further screening strategy.
 }
 }
 \keyword{datasets}
