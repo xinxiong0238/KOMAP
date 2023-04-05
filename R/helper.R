@@ -1,6 +1,7 @@
 #' Run komap main function
 #'
 #' @param input.cov A covariance matrix of the target disease with colnames and rownames equal to variable names.
+#' @param is.wide If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating node names and the last one indicating covariance value).
 #' @param target.code Main phecode of the target disease.
 #' @param target.cui Main NLP feature (CUI) of the target disease, can be NULL if NLP features are not available.
 #' @param nm.utl Variable name of health utility score.
@@ -34,12 +35,12 @@
 #' nm.y <- 'Y'
 #' dat.part <- dat_part
 #'
-#' out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+#' out <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
 #'                codify.feature, nlp.feature,
 #'                pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
 #'                dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #' @export
-KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
+KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
                   codify.feature = NULL, nlp.feature = NULL,
                   pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
                   mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
@@ -50,6 +51,30 @@ KOMAP <- function(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, d
     cuisearch.feature = NULL
   }else{
     cuisearch.feature = nlp.feature
+  }
+  if(!is.wide){
+    input.cov = as.data.frame(input.cov)
+    unique.node = unique(c(input.cov[,1], input.cov[,2]))
+    colnames(input.cov) = c('from', 'to', 'cov')
+
+    input.cov.wide = stats::reshape(as.data.frame(input.cov), idvar = "from", timevar = "to",
+                             direction = "wide")
+    rownames(input.cov.wide) = input.cov.wide$from; input.cov.wide$from = NULL
+    colnames(input.cov.wide) = stringr::str_remove(colnames(input.cov.wide), '^cov\\.')
+    miss.row = setdiff(unique.node, rownames(input.cov.wide))
+    miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.wide))
+    rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.wide)
+    input.cov.wide = rbind(input.cov.wide, miss.row.matrix)
+
+    miss.col = setdiff(unique.node, colnames(input.cov.wide))
+    miss.col.matrix = matrix(NA, nrow = nrow(input.cov.wide), ncol = length(miss.col))
+    colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.wide)
+    input.cov.wide = cbind(input.cov.wide, miss.col.matrix)
+
+    input.cov = input.cov.wide
+    input.cov[is.na(input.cov)] = 0
+    message(paste0('\nInput long format data, transformed to wide format covariance matrix (',
+                   length(unique.node),' unique nodes).'))
   }
   ### Check user's input
   if(!is.null(codify.feature) | !is.null(cuisearch.feature)){

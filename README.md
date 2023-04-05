@@ -28,7 +28,7 @@ devtools::install_github("xinxiong0238/KOMAP")
 
 ## Dara preprocessing
 
-### Input covariance matrix
+### Input covariance matrix (wide format)
 
 One of the KOMAP algorithm inputs is the covariance matrix of the
 clinical features (i.e., log(count+1)) derived from your target
@@ -145,6 +145,26 @@ matrix. For example, if you are interesting in rheumatoid arthritis
 phenotyping task, it is suggested to focus on patients who had at least
 1 count of `PheCode:714.1` in their EHR records.
 
+### Input covariance matrix (long format)
+
+You can also input the covariance matrix in a long format. The data must
+contain three columns with the first two indicating the node pair names.
+Note that when KOMAP tranforms the input to a wide format, it will
+assign 0 to missing pairwise covariance value. See an example below:
+
+``` r
+head(cov_RA_long)
+#> # A tibble: 6 × 3
+#>   from  to                   cov
+#>   <chr> <chr>              <dbl>
+#> 1 utl   utl             1.02    
+#> 2 utl   PheCode:714.1   0.319   
+#> 3 utl   C0003873        0.359   
+#> 4 utl   C0549206        0.122   
+#> 5 utl   RXNORM:32624    0.0258  
+#> 6 utl   PheCode:286.11 -0.000248
+```
+
 ### Input feature filters (optional)
 
 To further filter out unrelated codes, you can specify a vector of
@@ -184,12 +204,10 @@ has an additional column indicating the true label for each patient.
 
 ``` r
 fake_ehr_label_logcount_wide[1:3,1:5]
-#> # A tibble: 3 × 5
-#>       Y patient_num `LOINC:1742-6` `LOINC:1751-7` `LOINC:1920-8`
-#>   <dbl>       <int>          <dbl>          <dbl>          <dbl>
-#> 1     1          19           1.10          0.693           1.79
-#> 2     0         161           1.61          0.693           1.10
-#> 3     0         179           1.79          0               1.10
+#>   Y patient_num LOINC:1742-6 LOINC:1751-7 LOINC:1920-8
+#> 1 1          19     1.098612    0.6931472     1.791759
+#> 2 0         161     1.609438    0.6931472     1.098612
+#> 3 0         179     1.791759    0.0000000     1.098612
 ```
 
 The conditional statistics are derived based on this label column.
@@ -271,14 +289,22 @@ nm.id <- 'patient_num'
 nm.y <- 'Y'
 dat.part <- dat_part
 
+## When the input is in a long format:
+out_input_long <- KOMAP(cov_RA_long, is.wide = FALSE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+#> 
+#> Input long format data, transformed to wide format covariance matrix (42 unique nodes).
+#> 
+#> Finish estimating coefficients.
+
 ## Only fit the model without any validation and without feature screening
-out_0 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out_0 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> 
 #> Finish estimating coefficients.
 
 ## Only fit the model without any validation
-out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
@@ -303,7 +329,7 @@ out_1 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict
 #> Finish estimating coefficients.
 
 ## Fit the model and calculate simulated AUC
-out_2 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                            
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
              mu0, mu1, var0, var1, prev_Y, B = 10000)
@@ -330,7 +356,7 @@ out_2 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict
 #> Finish estimating AUC.
 
 ## If individual data is provided, KOMAP can perform disease score prediction
-out_3 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                          
              pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
              dat.part = dat.part, nm.id = nm.id)
@@ -357,7 +383,7 @@ out_3 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict
 #> Finish predicting scores.
 
 ## If individual data and gold label are provided, KOMAP can perform disease score prediction and calculate the true AUC
-out_4 <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                           
              pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
              dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)

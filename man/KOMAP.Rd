@@ -6,6 +6,7 @@
 \usage{
 KOMAP(
   input.cov,
+  is.wide = TRUE,
   target.code,
   target.cui,
   nm.utl,
@@ -30,6 +31,8 @@ KOMAP(
 }
 \arguments{
 \item{input.cov}{A covariance matrix of the target disease with colnames and rownames equal to variable names.}
+
+\item{is.wide}{If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating node names and the last one indicating covariance value).}
 
 \item{target.code}{Main phecode of the target disease.}
 
@@ -89,7 +92,7 @@ nm.id <- 'patient_num'
 nm.y <- 'Y'
 dat.part <- dat_part
 
-out <- KOMAP(input.cov, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
+out <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
                codify.feature, nlp.feature,
                pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
                dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)

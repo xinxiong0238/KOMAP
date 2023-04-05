@@ -9,6 +9,16 @@
 #' @format A numeric matrix with 53 rows and 53 columns
 NULL
 
+#' A long-format sample covariance table for rheumatoid arthritis
+#'
+#' A long-format covariance data frame of rheumatoid arthritis (RA) related feature counts (after log transformation). Must have three columns with the first two indicating the node name and the third one indicating covariance value.
+#'
+#' @docType data
+#' @keywords datasets
+#' @name cov_RA_long
+#' @usage data(cov_RA_long)
+#' @format A numeric matrix with 1681 rows and 3 columns
+NULL
 
 
 #' Codified features related to rheumatoid arthritis
