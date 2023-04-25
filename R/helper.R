@@ -188,6 +188,7 @@ KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict
     out.all = out.all[order(out.all$coeff, decreasing = TRUE), ]
     out.all$desc[out.all$feat == nm.utl] = 'Healthcare Utility'
   }
+  out.all = out.all %>% dplyr::arrange(disease, method, -abs(coeff))
   return(list(`long_df` = out.all,
               `lst` = out))
 }
@@ -360,9 +361,9 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
 
       theta = alpha_ma %*% b.all
       beta.all <- data.frame(`feat` = rownames(U), `theta` = theta)
-      beta.all$beta = NA; beta.all$beta[match(colnames(XTX), beta.all$feat)] = b.all
+      # beta.all$beta = NA; beta.all$beta[match(colnames(XTX), beta.all$feat)] = b.all
       method$beta = beta.all
-      method$est_score = score
+      # method$est_score = score
       out[[i]] = method
     }else{
       b.all = score = alpha = c()
@@ -441,11 +442,11 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
 
       theta = alpha_ma %*% b.all %*% gamma
       beta.all <- data.frame(`feat` = rownames(U), `theta` = theta)
-      beta.all$beta_ICD = beta.all$beta_NLP = NA
-      beta.all$beta_ICD[match(rownames(b.all), beta.all$feat)] = b.all[,1]
-      beta.all$beta_NLP[match(rownames(b.all), beta.all$feat)] = b.all[,2]
+      # beta.all$beta_ICD = beta.all$beta_NLP = NA
+      # beta.all$beta_ICD[match(rownames(b.all), beta.all$feat)] = b.all[,1]
+      # beta.all$beta_NLP[match(rownames(b.all), beta.all$feat)] = b.all[,2]
       method$beta = beta.all
-      method$est_score = U_new %*% b.all %*% gamma
+      # method$est_score = U_new %*% b.all %*% gamma
       out[[i]] = method
     }
   }

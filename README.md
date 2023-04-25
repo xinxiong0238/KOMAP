@@ -40,13 +40,13 @@ and 2 different ehr codes - lab code and diagnostic ICD code
 ``` r
 library(KOMAP)
 head(fake_ehr)
-#>   patient_num days_since_admission concept_type concept_code       value
-#> 1          10                    1    DIAG-ICD9          285 -999.000000
-#> 2          10                    1    DIAG-ICD9          599 -999.000000
-#> 3          10                    1    LAB-LOINC       6690-2    9.624889
-#> 4          10                    1    LAB-LOINC       6690-2    2.356438
-#> 5          10                    1    LAB-LOINC       2532-0  315.036167
-#> 6          10                    1    LAB-LOINC       2160-0    3.633457
+#>   patient_num days_since_admission concept_type concept_code
+#> 1          10                    1    DIAG-ICD9          285
+#> 2          10                    1    DIAG-ICD9          599
+#> 3          10                    1    LAB-LOINC       6690-2
+#> 4          10                    1    LAB-LOINC       6690-2
+#> 5          10                    1    LAB-LOINC       2532-0
+#> 6          10                    1    LAB-LOINC       2160-0
 ```
 
 We need to first calculate the raw concept count once per day for each
@@ -55,7 +55,7 @@ day, treat as one time):
 
 ``` r
 library(dplyr)
-fake_ehr_raw_count = fake_ehr %>% 
+fake_ehr_raw_count <- fake_ehr %>% 
   group_by(patient_num, concept_type, concept_code) %>%
   summarise(count_once_per_day = length(unique(days_since_admission)))
 head(fake_ehr_raw_count)
@@ -88,27 +88,15 @@ head(phecode_map)
 For each patient, the phecode count is equal to the sum of all its
 descendant ICD code once-per-day count:
 
-``` r
-fake_ehr_rollup_count_phecode = left_join(fake_ehr_raw_count %>% 
-                                            filter(concept_type == 'DIAG-ICD9'), phecode_map)
-#> Joining, by = "concept_code"
-fake_ehr_rollup_count_phecode = fake_ehr_rollup_count_phecode %>%
-  group_by(patient_num, concept_type, Phecode) %>%
-  summarise(count = sum(count_once_per_day)) %>%
-  mutate(concept_code = Phecode) %>%
-  select(!Phecode)
-#> `summarise()` has grouped output by 'patient_num', 'concept_type'. You can override using the `.groups` argument.
-```
-
 Then, we combine the rolled up phecode count and raw loinc count
 together:
 
 ``` r
-fake_ehr_count_loinc = fake_ehr_raw_count %>% filter(concept_type == 'LAB-LOINC') %>%
+fake_ehr_count_loinc <- fake_ehr_raw_count %>% filter(concept_type == 'LAB-LOINC') %>%
   mutate(count = count_once_per_day,
          concept_code = paste0('LOINC:', concept_code)) %>%
   select(!count_once_per_day)
-fake_ehr_count = rbind(fake_ehr_count_loinc, fake_ehr_rollup_count_phecode)
+fake_ehr_count <- rbind(fake_ehr_count_loinc, fake_ehr_rollup_count_phecode)
 head(fake_ehr_count)
 #> # A tibble: 6 × 4
 #> # Groups:   patient_num, concept_type [1]
@@ -126,12 +114,12 @@ Then we transform the data to the wide format, conduct logarithm
 transformation, and calculate the covariance matrix:
 
 ``` r
-fake_ehr_count_wide = tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_num'),
+fake_ehr_count_wide <- tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_num'),
                                          names_from = 'concept_code', values_from = 'count')
-fake_ehr_count_wide[is.na(fake_ehr_count_wide)] = 0
-fake_ehr_logcount_wide = fake_ehr_count_wide
-fake_ehr_logcount_wide[,-1] = log(fake_ehr_logcount_wide[, -1] + 1)
-fake_ehr_cov = cov(fake_ehr_logcount_wide[, -1])
+fake_ehr_count_wide[is.na(fake_ehr_count_wide)] <- 0
+fake_ehr_logcount_wide <- fake_ehr_count_wide
+fake_ehr_logcount_wide[,-1] <- log(fake_ehr_logcount_wide[, -1] + 1)
+fake_ehr_cov <- cov(fake_ehr_logcount_wide[, -1])
 fake_ehr_cov[1:3,1:3]
 #>              LOINC:1742-6 LOINC:1920-8 LOINC:1975-2
 #> LOINC:1742-6   0.41764272  -0.04620953  -0.15587476
@@ -227,11 +215,11 @@ and the conditional mean vectors must have names.
 
 If you want to obtain the accurate AUC value by providing individual
 count data, the input gold label data should have the format as
-`fake_ehr_label_count_wide` with one column indicating patient labels
-(the column nae should go to the `nm.y` argument). Additionally, you can
-have another column suggesting the sample probability (the column nae
-should go to the `nm.pi` argument) if each patient in the label data was
-sampled with unequal probability.
+`fake_ehr_label_logcount_wide` with one column indicating patient labels
+(the column name should go to the `nm.y` argument). Additionally, you
+can have another column suggesting the sample probability (the column
+name should go to the `nm.pi` argument) if each patient in the label
+data was sampled with unequal probability.
 
 ``` r
 fake_ehr_label_logcount_wide_pi[1:3,1:6]
@@ -271,11 +259,13 @@ library(KOMAP)
 ?dat_part
 ```
 
-### Phenotyping Example
+## Phenotyping Example
 
 This is a basic example of how to use the main function in the KOMAP
 package to perform model training, score prediction and model evaluation
 with built-in toy rheumatoid arthritis data.
+
+### Only output with regression coefficients
 
 ``` r
 codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
@@ -290,20 +280,55 @@ nm.y <- 'Y'
 dat.part <- dat_part
 
 ## When the input is in a long format:
-out_input_long <- KOMAP(cov_RA_long, is.wide = FALSE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+out_input_long <- KOMAP(cov_RA_long, is.wide = FALSE, target.code, target.cui, nm.utl,
+                        nm.multi = NULL, dict_RA, pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> 
 #> Input long format data, transformed to wide format covariance matrix (42 unique nodes).
 #> 
 #> Finish estimating coefficients.
+```
 
-## Only fit the model without any validation and without feature screening
+If you do not specify `pred`, `eval.real` or `eval.sim` equal to be
+`TRUE`, then KOMAP only output the regression coefficients which can be
+used for disease scoring calculation with additional individual data.
+Inside the `est` output, the `long_df` data frame in the output pulls
+coefficients from different model settings together if any (e.g., only
+use main ICD as surrogate or use both main ICD and main NLP as
+surrogates), while `lst` organizes the regression output by model
+settings.
+
+``` r
+head(out_input_long$est$long_df)
+#>          disease               method        target          feat
+#> 1: PheCode:714.1 mainICD + allfeature PheCode:714.1 PheCode:714.1
+#> 2: PheCode:714.1 mainICD + allfeature PheCode:714.1           utl
+#> 3: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0003873
+#> 4: PheCode:714.1 mainICD + allfeature PheCode:714.1      C1959609
+#> 5: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0919386
+#> 6: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0409651
+#>                                 desc       coeff
+#> 1:              rheumatoid arthritis  0.67831962
+#> 2:                Healthcare Utility -0.21875372
+#> 3:              Rheumatoid Arthritis  0.15097257
+#> 4:                    Erosion lesion  0.04129051
+#> 5:               Pathology procedure -0.03343481
+#> 6: Seropositive rheumatoid arthritis  0.03003230
+```
+
+Similarly, you can input the covariance matrix in wide format:
+
+``` r
 out_0 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> 
 #> Finish estimating coefficients.
+```
 
-## Only fit the model without any validation
+You can also specify a list of codified/narrative features that are
+relevant to the target disease. KOMAP will perform feature screening
+before regression:
+
+``` r
 out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,               
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
@@ -327,8 +352,17 @@ out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
+```
 
-## Fit the model and calculate simulated AUC
+### Output regression coefficients and simulated AUC
+
+When specifying `eval.sim=TRUE` and input conditional mean vectors,
+conditional covaraince matrices and the prevalence value, KOMAP will
+return not only the regression coefficients, but also a simulated AUC
+that helps a grasp of model performance without any individual labeled
+data.
+
+``` r
 out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                            
              pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
@@ -354,8 +388,21 @@ out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> 
 #> Finish estimating coefficients.
 #> Finish estimating AUC.
+out_2$sim_eval
+#>                      method       auc
+#> 1          mainICD + codify 0.9499877
+#> 2 mainICDNLP + codify & NLP 0.9690431
+```
 
-## If individual data is provided, KOMAP can perform disease score prediction
+### Output regression coefficients and predicted disease scores
+
+When specifying `pred=TRUE` and input a group of individual data (i.e.,
+log count of EHR features), KOMAP will return both the regression
+coefficients, and predicted disease scores for the input patients.
+Remember to specify the `nm.id` argument (unique patient id) to avoid
+score matcing issue.
+
+``` r
 out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                          
              pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
@@ -381,11 +428,29 @@ out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> 
 #> Finish estimating coefficients.
 #> Finish predicting scores.
+head(out_3$pred_prob)
+#>    patient_num mainICD + codify mainICDNLP + codify & NLP
+#> 3           s1        0.4132152                -1.1677991
+#> 5           s2       -0.2087015                 0.4529423
+#> 6           s3       -1.2699338                -2.6168660
+#> 10          s4       -0.6606499                -1.4898302
+#> 13          s5        0.2164402                 0.2210345
+#> 20          s6       -0.7194731                -0.3074381
+```
 
-## If individual data and gold label are provided, KOMAP can perform disease score prediction and calculate the true AUC
+### Output regression coefficients and true AUC
+
+When specifying `eval.real=TRUE` and input a group of individual data
+(i.e., log count of EHR features) as well as their labels, KOMAP will
+return both the regression coefficients, and real AUC evaluated based on
+your gold label data. Remember to specify the `nm.y` argument (gold
+label for each patient). It will also aumatically return the predicted
+disease score for each patient.
+
+``` r
 out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                           
-             pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
+             pred = FALSE, eval.real = TRUE, eval.sim = FALSE,
              dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
 #> Num of total feat: 184
@@ -407,6 +472,9 @@ out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> Num of CUI in cuisearch.feature: 71
 #> 
 #> Finish estimating coefficients.
-#> Finish predicting scores.
 #> Finish evaluating model prediction.
+out_4$real_eval
+#>                      method       auc F_score_max
+#> 1          mainICD + codify 0.9370693   0.8762717
+#> 2 mainICDNLP + codify & NLP 0.9588487   0.8904735
 ```

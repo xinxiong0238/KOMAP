@@ -33,7 +33,6 @@ A dataframe containing pseudo patient id and longitudinal EHR codes. The variabl
   \item days_since_admission time indicator
   \item concept_type two different EHR code types (`DIAG-ICD9` and `LAB-LOINC`) in this fake data
   \item concept_code EHR code name
-  \item value lab values. -999 if the record belongs to `DIAG-ICD9`.
 }
 }
 \keyword{datasets}
