@@ -1,7 +1,7 @@
 #' Run komap main function
 #'
 #' @param input.cov A covariance matrix of the target disease with colnames and rownames equal to variable names.
-#' @param is.wide If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating node names and the last one indicating covariance value).
+#' @param is.wide If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating row and column names and the last one indicating covariance value). If only inputing the lower/upper triangle part, the function will automatically fill the other side assuming symmetric covariance matrix.
 #' @param target.code Main phecode of the target disease.
 #' @param target.cui Main NLP feature (CUI) of the target disease, can be NULL if NLP features are not available.
 #' @param nm.utl Variable name of health utility score.
@@ -58,7 +58,7 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
     colnames(input.cov) = c('from', 'to', 'cov')
 
     input.cov.wide = stats::reshape(as.data.frame(input.cov), idvar = "from", timevar = "to",
-                             direction = "wide")
+                                    direction = "wide")
     rownames(input.cov.wide) = input.cov.wide$from; input.cov.wide$from = NULL
     colnames(input.cov.wide) = stringr::str_remove(colnames(input.cov.wide), '^cov\\.')
     miss.row = setdiff(unique.node, rownames(input.cov.wide))
@@ -72,14 +72,25 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
     input.cov.wide = cbind(input.cov.wide, miss.col.matrix)
 
     input.cov = input.cov.wide
+    input.cov.lower = input.cov[lower.tri(input.cov)]; input.cov.upper = input.cov[upper.tri(input.cov)]
+    if(all(is.na(input.cov.lower))){
+      input.cov[lower.tri(input.cov)] = input.cov[upper.tri(input.cov)]
+    }else{
+      if(all(is.na(input.cov.upper))){
+        input.cov[upper.tri(input.cov)] = input.cov[lower.tri(input.cov)]
+      }
+    }
     input.cov[is.na(input.cov)] = 0
     message(paste0('\nInput long format data, transformed to wide format covariance matrix (',
                    length(unique.node),' unique nodes).'))
   }
+  colnames(input.cov) = rownames(input.cov)
   ### Check user's input
   if(!is.null(codify.feature) | !is.null(cuisearch.feature)){
     KOMAP.est.check(input.cov, target.code, target.cui, nm.utl,
                     codify.feature, cuisearch.feature)
+  }else{
+    KOMAP.est.check.part(input.cov, target.code, target.cui, nm.utl)
   }
   out_main = KOMAP.est(input.cov, target.code, target.cui, nm.utl, nm.multi, dict,
                        codify.feature, cuisearch.feature)

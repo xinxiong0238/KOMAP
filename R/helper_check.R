@@ -8,7 +8,7 @@ node_format_check <- function(target.code, target.cui, input.cov, codify.feature
     stop('You must provide the variable name for the healthcare utility score!')
   }
 
-  nm.feat.all = sort(colnames(feat.cov))
+  nm.feat.all = sort(rownames(feat.cov))
   if(!all(nm.utl %in% nm.feat.all)){
     stop('The utl variable does not exist in your input covariance matrix!')
   }
@@ -109,6 +109,28 @@ node_format_check <- function(target.code, target.cui, input.cov, codify.feature
 
 }
 
+
+node_format_check_part <- function(target.code, target.cui, input.cov, nm.utl){
+  message('Check feature format in `input.cov`...')
+  feat.cov = input.cov
+  if(is.null(colnames(feat.cov)) | is.null(rownames(feat.cov))){
+    stop('The input covariance matrix must have colnames and rownames!')
+  }
+  if(is.null(nm.utl)){
+    stop('You must provide the variable name for the healthcare utility score!')
+  }
+
+  nm.feat.all = sort(rownames(feat.cov))
+  if(!all(nm.utl %in% nm.feat.all)){
+    stop('The utl variable does not exist in your input covariance matrix!')
+  }
+  message(paste0('Num of total feat: ', length(nm.feat.all)))
+
+}
+
+
+
+
 KOMAP.est.check <- function(input.cov, target.code, target.cui, nm.utl,
                         codify.feature, cuisearch.feature){
 
@@ -126,6 +148,24 @@ KOMAP.est.check <- function(input.cov, target.code, target.cui, nm.utl,
   ### Check input feature format
   node_format_check(target.code, target.cui, input.cov, codify.feature, cuisearch.feature, nm.utl)
 }
+
+KOMAP.est.check.part <- function(input.cov, target.code, target.cui, nm.utl){
+
+  ### Check conditions for KOMAP.est
+  if(is.null(target.code)){
+    stop('You must specify the main phecode for the target disease!')
+  }else{
+    if(!target.code %in% rownames(input.cov)) stop('Your main phecode does not exist in the covariance matrix!')
+  }
+
+  if(!is.null(target.cui)){
+    if(!target.cui %in% rownames(input.cov)) stop('Your main CUI does not exist in the covariance matrix!')
+  }
+
+  ### Check input feature format
+  node_format_check_part(target.code, target.cui, input.cov, nm.utl)
+}
+
 
 
 KOMAP.sim_auc.check <- function(out, feat.out, mu0, mu1, var0, var1, prev_Y){

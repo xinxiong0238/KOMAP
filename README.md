@@ -138,7 +138,9 @@ phenotyping task, it is suggested to focus on patients who had at least
 You can also input the covariance matrix in a long format. The data must
 contain three columns with the first two indicating the node pair names.
 Note that when KOMAP tranforms the input to a wide format, it will
-assign 0 to missing pairwise covariance value. See an example below:
+assign 0 to missing pairwise covariance value. If you only input the
+lower/upper triangle part, the function will automatically fill the
+other side assuming symmetric covariance matrix. See an example below:
 
 ``` r
 head(cov_RA_long)
@@ -270,7 +272,7 @@ with built-in toy rheumatoid arthritis data.
 ``` r
 codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
 nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
-input.cov <- cov_RA
+input.cov <- cov_RA_long
 target.code <- 'PheCode:714.1'
 target.cui <- 'C0003873'
 nm.utl <- 'utl'
@@ -280,10 +282,12 @@ nm.y <- 'Y'
 dat.part <- dat_part
 
 ## When the input is in a long format:
-out_input_long <- KOMAP(cov_RA_long, is.wide = FALSE, target.code, target.cui, nm.utl,
+out_input_long <- KOMAP(input.cov, is.wide = FALSE, target.code, target.cui, nm.utl,
                         nm.multi = NULL, dict_RA, pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> 
 #> Input long format data, transformed to wide format covariance matrix (42 unique nodes).
+#> Check feature format in `input.cov`...
+#> Num of total feat: 42
 #> 
 #> Finish estimating coefficients.
 ```
@@ -318,8 +322,11 @@ head(out_input_long$est$long_df)
 Similarly, you can input the covariance matrix in wide format:
 
 ``` r
+input.cov = cov_RA
 out_0 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+#> Check feature format in `input.cov`...
+#> Num of total feat: 184
 #> 
 #> Finish estimating coefficients.
 ```
