@@ -32,7 +32,7 @@ KOMAP(
 \arguments{
 \item{input.cov}{A covariance matrix of the target disease with colnames and rownames equal to variable names.}
 
-\item{is.wide}{If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating node names and the last one indicating covariance value).}
+\item{is.wide}{If \code{TRUE}, \code{input.cov} is treated as a normal p by p covariance matrix. If \code{FALSE}, treat \code{input.cov} as in a long format with three columns (the first two indicating row and column names and the last one indicating covariance value). If only inputing the lower/upper triangle part, the function will automatically fill the other side assuming symmetric covariance matrix.}
 
 \item{target.code}{Main phecode of the target disease.}
 

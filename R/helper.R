@@ -58,7 +58,7 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
     colnames(input.cov) = c('from', 'to', 'cov')
 
     input.cov.wide = stats::reshape(as.data.frame(input.cov), idvar = "from", timevar = "to",
-                                    direction = "wide")
+                             direction = "wide")
     rownames(input.cov.wide) = input.cov.wide$from; input.cov.wide$from = NULL
     colnames(input.cov.wide) = stringr::str_remove(colnames(input.cov.wide), '^cov\\.')
     miss.row = setdiff(unique.node, rownames(input.cov.wide))
@@ -84,7 +84,6 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
     message(paste0('\nInput long format data, transformed to wide format covariance matrix (',
                    length(unique.node),' unique nodes).'))
   }
-  colnames(input.cov) = rownames(input.cov)
   ### Check user's input
   if(!is.null(codify.feature) | !is.null(cuisearch.feature)){
     KOMAP.est.check(input.cov, target.code, target.cui, nm.utl,

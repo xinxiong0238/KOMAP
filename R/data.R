@@ -189,6 +189,57 @@ NULL
 NULL
 
 
+#' Fake EHR data for preprocessing illustration (main input of the function \code{gen_cov_input})
+#'
+#' A dataframe containing pseudo patient id, days since admission date and EHR codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item patient_num unique patient id (fake)
+#'   \item days_since_admission time indicator
+#'   \item code EHR code name
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name ehr_data
+#' @usage data(ehr_data)
+#' @format A data frame with 346 rows and 3 variables
+NULL
+
+
+
+#' Fake rollup dictionary for preprocessing illustration (main input of the function \code{gen_cov_input})
+#'
+#' A dataframe containing EHR codes and rollup group codes. The variables are as follows:
+#'
+#' \itemize{
+#'   \item code EHR code name
+#'   \item group Rolled-up group code
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name rollup_dict
+#' @usage data(rollup_dict)
+#' @format A data frame with 48 rows and 2 variables
+NULL
+
+#' Fake filters for preprocessing illustration (main input of the function \code{gen_cov_input})
+#'
+#' A dataframe containing EHR codes and the least frequency required for patient inclusion. The variables are as follows:
+#'
+#' \itemize{
+#'   \item code EHR code name
+#'   \item freq The least frequency that is required for patients to be included to calculate the covariance matrix
+#' }
+#'
+#' @docType data
+#' @keywords datasets
+#' @name filter_df
+#' @usage data(filter_df)
+#' @format A data frame with 1 rows and 2 variables
+NULL
+
 #' Conditional feature mean vector (Y=0)
 #'
 #' A named numeric vector containing the mean of log(feature count) given negative labels for RA disease(Y=0).
