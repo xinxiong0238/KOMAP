@@ -40,6 +40,7 @@
 #'                pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
 #'                dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #' @export
+#' @importFrom rlang .data
 KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
                   codify.feature = NULL, nlp.feature = NULL,
                   pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
@@ -198,7 +199,7 @@ KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict
     out.all = out.all[order(out.all$coeff, decreasing = TRUE), ]
     out.all$desc[out.all$feat == nm.utl] = 'Healthcare Utility'
   }
-  out.all = out.all %>% dplyr::arrange(disease, method, -abs(coeff))
+  out.all = out.all %>% dplyr::arrange(.data$disease,.data$ method, -abs(.data$coeff))
   return(list(`long_df` = out.all,
               `lst` = out))
 }

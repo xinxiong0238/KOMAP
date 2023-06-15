@@ -90,6 +90,18 @@ fake_ehr_cov[1:3,1:3]
 
 Note that it may be beneficial to screen out patients who never have the diagnostic code of your target disease before calculating the covariance matrix. For example, if you are interesting in rheumatoid arthritis phenotyping task, it is suggested to focus on patients who had at least 1 count of `PheCode:714.1` in their EHR records.
 
+### One convenient function
+To wrap up the aforementioned preprocessing steps, the KOMAP package provides one function `gen_cov_input` with a raw longitudinal ehr data, one rollup dictionary and some frequency filters as the function input:
+```{r message=FALSE}
+data(ehr_data)
+data(rollup_dict)
+data(filter_df)
+input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
+input_cov[1:3, 1:3]
+```
+
+
+
 ### Input covariance matrix (long format)
 You can also input the covariance matrix in a long format. The data must contain three columns with the first two indicating the node pair names. Note that when KOMAP tranforms the input to a wide format, it will assign 0 to missing pairwise covariance value. If you only input the lower/upper triangle part, the function will automatically fill the other side assuming symmetric covariance matrix. See an example below:
 

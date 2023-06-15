@@ -11,6 +11,7 @@
 #' data(filter_df)
 #' input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
 #' @export
+#' @importFrom rlang .data
 gen_cov_input <- function(ehr_data, rollup_dict, filter_df){
   colnames(ehr_data) <- c('patient_num', 'days_since_admission', 'code')
   colnames(filter_df) <- c('code', 'freq')
@@ -22,36 +23,36 @@ gen_cov_input <- function(ehr_data, rollup_dict, filter_df){
   }
 
   ehr_raw_count <- ehr_data %>%
-    group_by(patient_num, code) %>%
-    summarise(count_once_per_day = length(unique(days_since_admission)))
-  ehr_raw_count <- left_join(ehr_raw_count, rollup_dict, multiple = "all")
+    dplyr::group_by(.data$patient_num, .data$code) %>%
+    dplyr::summarise(count_once_per_day = length(unique(.data$days_since_admission)))
+  ehr_raw_count <- dplyr::left_join(ehr_raw_count, rollup_dict, multiple = "all")
   ehr_raw_count$group[is.na(ehr_raw_count$group)] <-
     ehr_raw_count$code[is.na(ehr_raw_count$group)]
 
   ehr_rollup_count <- ehr_raw_count %>%
-    group_by(patient_num, group) %>%
-    summarise(count = sum(count_once_per_day))
+    dplyr::group_by(.data$patient_num, .data$group) %>%
+    dplyr::summarise(count = sum(.data$count_once_per_day))
 
   ehr_count_wide <- tidyr::pivot_wider(ehr_rollup_count, id_cols = c('patient_num'),
                                        names_from = 'group', values_from = 'count')
   ehr_count_wide[is.na(ehr_count_wide)] <- 0
   if(!is.null(filter_df)){
-    filter_df <- left_join(filter_df, rollup_dict)
+    filter_df <- dplyr::left_join(filter_df, rollup_dict)
     filter_df$group[is.na(filter_df$group)] = filter_df$code[is.na(filter_df$group)]
     if(nrow(filter_df) > 0){
       id_filter = ehr_rollup_count$patient_num
       for(i in 1:nrow(filter_df)){
         id = ehr_rollup_count %>%
-          filter(group == filter_df$group[i] & count >= filter_df$freq[i]) %>%
-          select(patient_num)
+          dplyr::filter(.data$group == filter_df$group[i] & .data$count >= filter_df$freq[i]) %>%
+          dplyr::select(.data$patient_num)
         id_filter = intersect(id_filter, id$patient_num)
       }
-      ehr_count_wide <- ehr_count_wide %>% filter(patient_num %in% id_filter)
+      ehr_count_wide <- ehr_count_wide %>% dplyr::filter(.data$patient_num %in% id_filter)
     }
   }
 
   ehr_logcount_wide <- ehr_count_wide
   ehr_logcount_wide[,-1] <- log(ehr_logcount_wide[, -1] + 1)
-  ehr_cov <- cov(ehr_logcount_wide[, -1])
+  ehr_cov <- stats::cov(ehr_logcount_wide[, -1])
   return(ehr_cov)
 }

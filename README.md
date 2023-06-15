@@ -133,6 +133,24 @@ matrix. For example, if you are interesting in rheumatoid arthritis
 phenotyping task, it is suggested to focus on patients who had at least
 1 count of `PheCode:714.1` in their EHR records.
 
+### One convenient function
+
+To wrap up the aforementioned preprocessing steps, the KOMAP package
+provides one function `gen_cov_input` with a raw longitudinal ehr data,
+one rollup dictionary and some frequency filters as the function input:
+
+``` r
+data(ehr_data)
+data(rollup_dict)
+data(filter_df)
+input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
+input_cov[1:3, 1:3]
+#>                  LAB-LOINC:1742-6 LAB-LOINC:1920-8 LAB-LOINC:1975-2
+#> LAB-LOINC:1742-6       0.39235376      -0.04103243       -0.3317790
+#> LAB-LOINC:1920-8      -0.04103243       0.15649504        0.1222289
+#> LAB-LOINC:1975-2      -0.33177901       0.12222891        0.3614025
+```
+
 ### Input covariance matrix (long format)
 
 You can also input the covariance matrix in a long format. The data must

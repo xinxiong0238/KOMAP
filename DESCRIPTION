@@ -17,6 +17,8 @@ Imports:
     stringr,
     stats,
     magrittr,
+    rlang,
+    tidyr,
     MASS
 RoxygenNote: 7.2.3
 URL: https://github.com/xinxiong0238/KOMAP
