@@ -227,7 +227,7 @@ KOMAP.eval.check <- function(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_n
   if(!nm.y %in% colnames(gold.label)){
     stop('The nm.y column does not exist in `gold.label`!')
   }
-  dat.merge = dplyr::left_join(gold.label, pred.prob, by = nm.id)
+  dat.merge = dplyr::left_join(gold.label, pred.prob$pred.score, by = nm.id)
   if(nrow(dat.merge) == 0){
     stop('There is no patient in the intersection of `gold.label` and `dat.part`!')
   }

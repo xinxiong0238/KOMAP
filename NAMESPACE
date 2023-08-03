@@ -2,6 +2,8 @@
 
 export("%>%")
 export(KOMAP)
+export(KOMAP_corrupt)
 export(gen_cov_input)
+import(mclust)
 importFrom(magrittr,"%>%")
 importFrom(rlang,.data)

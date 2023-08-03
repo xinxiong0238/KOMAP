@@ -17,6 +17,7 @@ Imports:
     stringr,
     stats,
     magrittr,
+    mclust,
     rlang,
     tidyr,
     MASS

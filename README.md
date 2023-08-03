@@ -423,11 +423,15 @@ out_2$sim_eval
 
 When specifying `pred=TRUE` and input a group of individual data (i.e.,
 log count of EHR features), KOMAP will return both the regression
-coefficients, and predicted disease scores for the input patients.
-Remember to specify the `nm.id` argument (unique patient id) to avoid
-score matcing issue.
+coefficients, predicted disease scores and predicted disease labels
+(using gaussian mixture model) for the input patients. Remember to
+specify the `nm.id` argument (unique patient id) to avoid score matching
+issue.
 
 ``` r
+library(mclust)
+#> Package 'mclust' version 5.4.9
+#> Type 'citation("mclust")' for citing this R package in publications.
 out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
              codify.feature, nlp.feature,                          
              pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
@@ -453,7 +457,7 @@ out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> 
 #> Finish estimating coefficients.
 #> Finish predicting scores.
-head(out_3$pred_prob)
+head(out_3$pred_prob$pred.score)
 #>    patient_num mainICD + codify mainICDNLP + codify & NLP
 #> 3           s1        0.4132152                -1.1677991
 #> 5           s2       -0.2087015                 0.4529423
@@ -461,6 +465,14 @@ head(out_3$pred_prob)
 #> 10          s4       -0.6606499                -1.4898302
 #> 13          s5        0.2164402                 0.2210345
 #> 20          s6       -0.7194731                -0.3074381
+head(out_3$pred_prob$pred.cluster)
+#>    patient_num mainICD + codify mainICDNLP + codify & NLP
+#> 3           s1          disease                no disease
+#> 5           s2          disease                   disease
+#> 6           s3       no disease                no disease
+#> 10          s4       no disease                no disease
+#> 13          s5          disease                   disease
+#> 20          s6       no disease                   disease
 ```
 
 ### Output regression coefficients and true AUC

@@ -23,29 +23,15 @@
 #' @param nm.pi The column name of sample probability in \code{gold.label} if individuals in \code{gold.label} are generated with different probabilities. Default is \code{NULL}, meaning a uniform sample distribution.
 #' @param nm.y The column name of labels in \code{gold.label}. Must be provided if \code{eval.real}=\code{TRUE}.
 #' @returns A list containing estimation and/or prediction and/or evaluation results by running KOMAP.
-#' @examples
-#' codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
-#' nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
-#' input.cov <- cov_RA
-#' target.code <- 'PheCode:714.1'
-#' target.cui <- 'C0003873'
-#' nm.utl <- 'utl'
-#' nm.pi <- 'pi'
-#' nm.id <- 'patient_num'
-#' nm.y <- 'Y'
-#' dat.part <- dat_part
-#' library(mclust)
-#' out <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-#'                codify.feature, nlp.feature,
-#'                pred = TRUE, eval.real = TRUE, eval.sim = FALSE,
-#'                dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #' @export
 #' @importFrom rlang .data
-KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict = NULL,
-                  codify.feature = NULL, nlp.feature = NULL,
-                  pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-                  mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
-                  dat.part = NULL, nm.id = NULL, nm.pi = NULL, nm.y = NULL){
+KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, nm.disease,
+                          nm.utl, nm.corrupt.code, nm.corrupt.cui,
+                          nm.multi = NULL, dict = NULL,
+                          codify.feature = NULL, nlp.feature = NULL,
+                          pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
+                          mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
+                          dat.part = NULL, nm.id = NULL, nm.pi = NULL, nm.y = NULL){
   oldw <- getOption("warn")
   options(warn = -1)
   if(is.null(nlp.feature)){
@@ -59,7 +45,7 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
     colnames(input.cov) = c('from', 'to', 'cov')
 
     input.cov.wide = stats::reshape(as.data.frame(input.cov), idvar = "from", timevar = "to",
-                             direction = "wide")
+                                    direction = "wide")
     rownames(input.cov.wide) = input.cov.wide$from; input.cov.wide$from = NULL
     colnames(input.cov.wide) = stringr::str_remove(colnames(input.cov.wide), '^cov\\.')
     miss.row = setdiff(unique.node, rownames(input.cov.wide))
@@ -87,13 +73,14 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
   }
   ### Check user's input
   if(!is.null(codify.feature) | !is.null(cuisearch.feature)){
-    KOMAP.est.check(input.cov, target.code, target.cui, nm.utl,
+    KOMAP.est.check(input.cov.train, target.code, target.cui, nm.utl,
                     codify.feature, cuisearch.feature)
   }else{
-    KOMAP.est.check.part(input.cov, target.code, target.cui, nm.utl)
+    KOMAP.est.check.part(input.cov.train, target.code, target.cui, nm.utl)
   }
-  out_main = KOMAP.est(input.cov, target.code, target.cui, nm.utl, nm.multi, dict,
-                       codify.feature, cuisearch.feature)
+  out_main = KOMAP.est.corrupt(input.cov.train, input.cov.valid, target.code, target.cui, nm.disease,
+                               nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, dict,
+                               codify.feature, cuisearch.feature)
   message('\nFinish estimating coefficients.')
   out = out_main$lst
   method_nm = names(out)
@@ -109,7 +96,7 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
 
   if(pred){
     KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
-    pred.prob = KOMAP.pred(out, target.code, dat.part, nm.utl, nm.multi, nm.id)
+    pred.prob = KOMAP.pred.corrupt(out, target.code, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id)
     out_return = c(out_return, `pred_prob` = list(pred.prob))
     message('Finish predicting scores.')
   }
@@ -125,7 +112,7 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
       message('Finish evaluating model prediction.')
     }else{
       KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
-      pred.prob = KOMAP.pred(out, target.code, dat.part, nm.utl, nm.multi, nm.id)
+      pred.prob = KOMAP.pred.corrupt(out, target.code, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id)
       gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
       gold.label = stats::na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
@@ -140,24 +127,29 @@ KOMAP <- function(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm
 }
 
 
-KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict,
-                      codify.feature, cuisearch.feature){
+KOMAP.est.corrupt <- function(input.cov.train, input.cov.valid, target.code, target.cui, nm.disease,
+                              nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, dict,
+                              codify.feature, cuisearch.feature){
   out.all = c()
   parent.code0 = stringr::str_extract(target.code, 'PheCode\\:[0-9]+')
   parent.code1 = stringr::str_extract(target.code, 'PheCode\\:[0-9]+\\.[0-9]{1}')
   parent.code2 = stringr::str_extract(target.code, 'PheCode\\:[0-9]+\\.[0-9]{2}')
   if(!is.na(parent.code2)){
-    idd = which(!rownames(input.cov) %in% c(parent.code0, parent.code1))
-    input.cov = input.cov[idd, idd]
+    idd = which(!rownames(input.cov.train) %in% c(parent.code0, parent.code1))
+    input.cov.train = input.cov.train[idd, idd]
+    idd = which(!rownames(input.cov.valid) %in% c(parent.code0, parent.code1))
+    input.cov.valid = input.cov.valid[idd, idd]
   }else{
     if(!is.na(parent.code1)){
-      idd = which(!rownames(input.cov) %in% c(parent.code0))
-      input.cov = input.cov[idd, idd]
+      idd = which(!rownames(input.cov.train) %in% c(parent.code0))
+      input.cov.train = input.cov.train[idd, idd]
+      idd = which(!rownames(input.cov.valid) %in% c(parent.code0))
+      input.cov.valid = input.cov.valid[idd, idd]
     }
   }
 
   if(is.null(codify.feature) & is.null(cuisearch.feature)){
-    cuisearch.feature.new = codify.feature.new = setdiff(colnames(input.cov), c(nm.utl, nm.multi))
+    cuisearch.feature.new = codify.feature.new = setdiff(colnames(input.cov.train), c(nm.utl, nm.multi))
   }else{
     if(is.null(codify.feature)){
       codify.feature.new = target.code
@@ -172,9 +164,14 @@ KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict
       }
     }
   }
-  out = gen.KOMAP.est.table(input.cov, nm.utl, nm.multi, target.code, target.cui, dict,
-                            codify.feature = codify.feature, cuisearch.feature = cuisearch.feature,
-                            codify.feature.new = codify.feature.new, cuisearch.feature.new = cuisearch.feature.new)
+  cuisearch.feature = unique(c(nm.corrupt.cui, cuisearch.feature))
+  codify.feature = unique(c(nm.corrupt.code, codify.feature))
+  cuisearch.feature.new = unique(c(nm.corrupt.cui, cuisearch.feature.new))
+  codify.feature.new = unique(c(nm.corrupt.code, codify.feature.new))
+
+  out = gen.KOMAP.est.table.corrupt(input.cov.train, input.cov.valid, nm.disease, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, target.code, target.cui, dict,
+                                    codify.feature = codify.feature, cuisearch.feature = cuisearch.feature,
+                                    codify.feature.new = codify.feature.new, cuisearch.feature.new = cuisearch.feature.new)
   out.df = sapply(1:length(out), function(i){
     a = data.frame(`disease` = target.code,
                    `method` = names(out)[i],
@@ -205,8 +202,8 @@ KOMAP.est <- function(input.cov, target.code, target.cui, nm.utl, nm.multi, dict
 }
 
 
-gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target.cui, dict,
-                                codify.feature, cuisearch.feature,codify.feature.new, cuisearch.feature.new){
+gen.KOMAP.est.table.corrupt <- function(input.cov.train, input.cov.valid, nm.disease, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, target.code, target.cui, dict,
+                                        codify.feature, cuisearch.feature,codify.feature.new, cuisearch.feature.new){
   if(is.null(target.code) & is.null(target.cui)){
     warning("You must at least specify one target (target.code or target.cui)!")
     return(0)
@@ -214,21 +211,29 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
   alpha.glmnent = 0.15
   ## By default: input.cov = XTX/N, X=(1,X_{sur},X_{komap},X_{u})
 
-  colnames(input.cov)[stringr::str_detect(colnames(input.cov), '^CCS-PCS')] =
-    stringr::str_replace(colnames(input.cov)[stringr::str_detect(colnames(input.cov), '^CCS-PCS')],
+  colnames(input.cov.train)[stringr::str_detect(colnames(input.cov.train), '^CCS-PCS')] =
+    stringr::str_replace(colnames(input.cov.train)[stringr::str_detect(colnames(input.cov.train), '^CCS-PCS')],
                          '^CCS-PCS', 'CCS')
-  rownames(input.cov)[stringr::str_detect(rownames(input.cov), '^CCS-PCS')] =
-    stringr::str_replace(rownames(input.cov)[stringr::str_detect(rownames(input.cov), '^CCS-PCS')],
+  rownames(input.cov.train)[stringr::str_detect(rownames(input.cov.train), '^CCS-PCS')] =
+    stringr::str_replace(rownames(input.cov.train)[stringr::str_detect(rownames(input.cov.train), '^CCS-PCS')],
                          '^CCS-PCS', 'CCS')
 
-  nm.others = colnames(input.cov)
+  colnames(input.cov.valid)[stringr::str_detect(colnames(input.cov.valid), '^CCS-PCS')] =
+    stringr::str_replace(colnames(input.cov.valid)[stringr::str_detect(colnames(input.cov.valid), '^CCS-PCS')],
+                         '^CCS-PCS', 'CCS')
+  rownames(input.cov.valid)[stringr::str_detect(rownames(input.cov.valid), '^CCS-PCS')] =
+    stringr::str_replace(rownames(input.cov.valid)[stringr::str_detect(rownames(input.cov.valid), '^CCS-PCS')],
+                         '^CCS-PCS', 'CCS')
+
+  nm.others = colnames(input.cov.train)
   nm.others = nm.others[!nm.others %in% c(target.code, target.cui, nm.utl)]
   all.nm = c(target.code, target.cui, nm.others, nm.utl)
   if(!is.null(nm.multi)){
     all.nm = c(all.nm, nm.multi)
   }
-  feat.cov = input.cov[all.nm, all.nm]
-  nm.feat.all = sort(colnames(feat.cov))
+  feat.cov.train = input.cov.train[all.nm, all.nm]
+  feat.cov.valid = input.cov.valid[all.nm, all.nm]
+  nm.feat.all = sort(colnames(feat.cov.train))
   nm.cui = nm.feat.all[stringr::str_detect(nm.feat.all, "^C[0-9]{7}")]
   nm.code = setdiff(nm.feat.all, c(nm.cui, nm.utl))
 
@@ -237,8 +242,8 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
     nm.code.filter = codify.feature.new
     nm.cui.filter.final = cuisearch.feature.new
 
-    nm.code.filter = intersect(stats::na.omit(nm.code.filter), colnames(feat.cov))
-    nm.cui.filter.final = intersect(stats::na.omit(nm.cui.filter.final), colnames(feat.cov))
+    nm.code.filter = intersect(stats::na.omit(nm.code.filter), colnames(feat.cov.train))
+    nm.cui.filter.final = intersect(stats::na.omit(nm.cui.filter.final), colnames(feat.cov.train))
 
     if(is.null(cuisearch.feature) & is.null(codify.feature)){
       out = c()
@@ -268,7 +273,7 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
   }else{
     if(!is.null(target.code)){
       nm.code.filter = codify.feature.new
-      nm.code.filter = intersect(stats::na.omit(nm.code.filter), colnames(feat.cov))
+      nm.code.filter = intersect(stats::na.omit(nm.code.filter), colnames(feat.cov.train))
       if(is.null(cuisearch.feature) & is.null(codify.feature)){
         out = c()
         method =  list(`feat` = c(nm.code.filter, target.code),
@@ -284,7 +289,7 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
     }else{
       if(!is.null(target.cui)){
         nm.cui.filter.final = cuisearch.feature.new
-        nm.cui.filter.final = intersect(stats::na.omit(nm.cui.filter.final), colnames(feat.cov))
+        nm.cui.filter.final = intersect(stats::na.omit(nm.cui.filter.final), colnames(feat.cov.train))
 
         if(is.null(cuisearch.feature) & is.null(codify.feature)){
           out = c()
@@ -317,19 +322,34 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
         all.nm =  c(target, setdiff(feat, target), nm.utl, nm.multi)
       }
 
-      feat.cov.part = feat.cov[all.nm, all.nm]
+      feat.cov.part = feat.cov.train[all.nm, all.nm]
+      feat.cov.part.valid = feat.cov.valid[all.nm, all.nm]
 
       U = svd(feat.cov.part)
       U = t(U$u %*% sqrt(diag(U$d)))
-      colnames(U) = rownames(U) = colnames(feat.cov.part)
+      U.valid = svd(feat.cov.part.valid)
+      U.valid = t(U.valid$u %*% sqrt(diag(U.valid$d)))
+      colnames(U) = rownames(U) = colnames(U.valid) = rownames(U.valid) = colnames(feat.cov.part)
+
+      # U = U[!rownames(U) %in% nm.corrupt.code, ]
       #! reg1 = stats::lm(U[, target] ~ 0 + U[, 1] + U[, nm.utl])
       reg1 = stats::lm(U[, target] ~ 0 + U[, nm.utl])
       U_new = U; U_new[, target] = reg1$residuals
+      # reg1_corrupt = stats::lm(U[, nm.corrupt.code] ~ 0 + U[, nm.utl])
+      # U_new[, nm.corrupt.code] = reg1_corrupt$residuals
+      U_new[, nm.corrupt.code] = U_new[, nm.corrupt.code] - reg1$coefficients * U_new[, nm.utl]
+      cor(U_new[, target], U_new[, nm.corrupt.code])
+
+      U.valid[, target] = U.valid[, target] - reg1$coefficients * U.valid[, nm.utl]
+      U.valid[, nm.corrupt.code] = U.valid[, nm.corrupt.code] - reg1$coefficients * U.valid[, nm.utl]
+      cor(U.valid[, target], U.valid[, nm.corrupt.code])
+
       alpha = reg1$coefficients
-      n_komap = length(setdiff(feat, target))
+      n_komap = length(setdiff(feat, c(nm.corrupt.code, target)))
       alpha_ma = cbind(c(1, rep(0, n_komap), -alpha),
                        rbind(matrix(0, 1, n_komap + length(nm.utl)),
                              diag(1, nrow = n_komap + length(nm.utl))))
+      colnames(alpha_ma) = c(target, setdiff(feat, c(nm.corrupt.code, target)), nm.utl)
 
       if(!is.null(nm.multi)){
         all.nm.multi = c(target, setdiff(feat, target), nm.utl, nm.multi)
@@ -353,28 +373,36 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
       #! U_new = U_new[,-1]
       # U_new = U_new[c(target, setdiff(feat, target), nm.utl),c(target, setdiff(feat, target), nm.utl)]
       Y = U_new[, target]
-      XTX <- t(U_new) %*% U_new
-      XTY <- t(U_new) %*% Y
-      #!!!ask molei W_vec <- diag(XTX) * lambda
-      # W_vec <- rep(lambda, nrow(XTX))
-      W_vec <- diag(XTX)
-      W <- diag(W_vec)
-
-      if (ncol(W) == 0){
-        W <- 0
-      }
+      id_target = which(colnames(U_new) == target)
+      id_target_corrupt = which(colnames(U_new) == nm.corrupt.code)
       set.seed(10101)
-      cv.fit <- glmnet::cv.glmnet(U_new, Y, intercept = F, alpha = alpha.glmnent, standardize = F)
-      # plot(cv.fit, main = paste('No corruption, ICDonly, ', target))
-      plot_data = c(plot_data, list(cv.fit))
-      model.fit <- glmnet::glmnet(U_new, Y, intercept = F, alpha = alpha.glmnent, standardize = F,
-                                  lambda = cv.fit$lambda.min)
+      cv.fit <- glmnet::cv.glmnet(U_new[, -id_target], Y, intercept = F, alpha = alpha.glmnent, standardize = F)
+      lambda_vec = cv.fit$lambda
+      mse_vec = sapply(lambda_vec, function(lambda){
+        model.fit <- glmnet::glmnet(U_new[, -id_target_corrupt], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
+                                    lambda = lambda)
+        # predict.valid.fit <- predict(model.fit, newx = U.valid[, -id_target])
+        junk = U.valid[, -c(id_target)]
+        colnames(junk)[colnames(junk) == nm.corrupt.code] = target
+        coef.beta = as.matrix(model.fit$beta)
+        predict.valid.fit <- junk %*% coef.beta[colnames(junk), ]
+        mse.fit = mean((U.valid[, id_target] - predict.valid.fit)^2)
+        return(mse.fit)
+      })
+      plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDonly, ', target))
+      abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+      # plot(cv.fit, main = paste(nm.disease, ' Corrupt ICDonly, ', target))
+      # plot_data = c(plot_data, list(cv.fit))
+      plot_data = c(plot_data, list(lambda = lambda_vec, mse = mse_vec))
+      model.fit <- glmnet::glmnet(U_new[, -id_target_corrupt], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
+                                  lambda = lambda_vec[which.min(mse_vec)])
       b.all <- as.vector(model.fit$beta)
       # b.all.ori <- solve(XTX + W) %*% XTY
-      score = U_new %*% b.all
+      # score = U_new[, -id_target] %*% b.all
 
-      theta = alpha_ma %*% b.all
-      beta.all <- data.frame(`feat` = rownames(U), `theta` = theta)
+      rownames(model.fit$beta)[which(rownames(model.fit$beta) == nm.corrupt.code)] = target
+      theta = alpha_ma[,rownames(model.fit$beta)] %*% model.fit$beta
+      beta.all <- data.frame(`feat` = rownames(model.fit$beta), `theta` = as.vector(theta))
       # beta.all$beta = NA; beta.all$beta[match(colnames(XTX), beta.all$feat)] = b.all
       method$beta = beta.all
       method$plot_data = plot_data
@@ -382,7 +410,7 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
       out[[i]] = method
     }else{
       b.all = score = alpha = c()
-
+      nm.corrupt.vec = c(nm.corrupt.code, nm.corrupt.cui)
       # ##!! first together regress out utl for main codes and then estimate beta together!!
       #! all.nm = c('constant', target, setdiff(feat, target), nm.utl)
       if(is.null(nm.multi)){
@@ -391,23 +419,39 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
         all.nm =  c(target, setdiff(feat, target), nm.utl, nm.multi)
       }
 
-      feat.cov.part = feat.cov[all.nm, all.nm]
+      feat.cov.part = feat.cov.train[all.nm, all.nm]
+      feat.cov.part.valid = feat.cov.valid[all.nm, all.nm]
+
       U = svd(feat.cov.part)
       U = t(U$u %*% sqrt(diag(U$d)))
-      colnames(U) = rownames(U) = colnames(feat.cov.part)
-      #! U_new = U[,-1]
+      U.valid = svd(feat.cov.part.valid)
+      U.valid = t(U.valid$u %*% sqrt(diag(U.valid$d)))
+      colnames(U) = rownames(U) = colnames(U.valid) = rownames(U.valid) = colnames(feat.cov.part)
+
       U_new = U
       for(j in 1:length(target)){
         target.j = target[j]
         reg1 = stats::lm(U[, target.j] ~ 0 + U[, nm.utl])
         U_new[, target.j] = reg1$residuals
+        nm.corrupt = nm.corrupt.vec[j]
+
+        # reg1_corrupt = stats::lm(U[, nm.corrupt] ~ 0 + U[, nm.utl])
+        # U_new[, nm.corrupt] = reg1_corrupt$residuals
+        U_new[, nm.corrupt] = U_new[, nm.corrupt] - reg1$coefficients * U_new[, nm.utl]
+        cor(U_new[, target.j], U_new[, nm.corrupt])
+
+        U.valid[, target.j] = U.valid[, target.j] - reg1$coefficients * U.valid[, nm.utl]
+        U.valid[, nm.corrupt] = U.valid[, nm.corrupt] - reg1$coefficients * U.valid[, nm.utl]
+        cor(U.valid[, target.j], U.valid[, nm.corrupt])
+
         alpha = cbind(alpha, reg1$coefficients)
       }
-      n_komap = length(setdiff(feat, target))
+      n_komap = length(setdiff(feat, c(nm.corrupt.code, nm.corrupt.cui, target)))
       alpha_ma = cbind(c(1, 0, rep(0, n_komap), -alpha[, 1]),
                        c(0, 1, rep(0, n_komap), -alpha[, 2]),
                        rbind(matrix(0, 2, n_komap + length(nm.utl)),
                              diag(1, nrow = n_komap + length(nm.utl))))
+      colnames(alpha_ma) = c(target, setdiff(feat, c(nm.corrupt.code, nm.corrupt.cui, target)), nm.utl)
 
       if(!is.null(nm.multi)){
         all.nm.multi = c(target, setdiff(feat, target), nm.utl, nm.multi)
@@ -432,33 +476,48 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
       for(j in 1:length(target)){
         target.j = target[j]
         Y = U_new[, target.j]
-        XTX <- t(U_new) %*% U_new
-        XTY <- t(U_new) %*% Y
-        #!!!! W_vec <- diag(XTX) * lambda
-        # W_vec <- rep(lambda, nrow(XTX))
-        W_vec <- diag(XTX)
-        W <- diag(W_vec)
-
-        if (ncol(W) == 0){
-          W <- 0
-        }
+        id_target = which(colnames(U_new) == target.j)
+        id_target_corrupt = which(colnames(U_new) == nm.corrupt.vec[j])
+        id_elsetarget_corrupt = which(colnames(U_new) == nm.corrupt.vec[3-j])
         set.seed(10101)
-        cv.fit <- glmnet::cv.glmnet(U_new, Y, intercept = F, alpha = alpha.glmnent, standardize = FALSE)
-        # plot(cv.fit, main = paste('No corruption, ICDNLP, ', target.j))
-        plot_data = c(plot_data, list(cv.fit))
-        model.fit <- glmnet::glmnet(U_new, Y, intercept = F, alpha = alpha.glmnent, standardize = FALSE,
-                                    lambda = cv.fit$lambda.min)
-        b.all0 <- as.vector(model.fit$beta)
+        cv.fit <- glmnet::cv.glmnet(U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)], Y,
+                                    intercept = F, alpha = alpha.glmnent, standardize = F)
+
+        lambda_vec = cv.fit$lambda
+        mse_vec = sapply(lambda_vec, function(lambda){
+          model.fit <- glmnet::glmnet(U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
+                                      lambda = lambda)
+          junk = U.valid[, -c(id_target, id_elsetarget_corrupt)]
+          colnames(junk)[colnames(junk) == nm.corrupt.vec[j]] = target.j
+          coef.beta = as.matrix(model.fit$beta)
+          predict.valid.fit <- junk %*% coef.beta[colnames(junk), ]
+          # predict.valid.fit <- predict(model.fit, newx = U.valid[, -c(id_target, id_elsetarget_corrupt)])
+          mse.fit = mean((U.valid[, id_target] - predict.valid.fit)^2)
+          return(mse.fit)
+        })
+        plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDNLP, ', target.j))
+        abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+        # plot(cv.fit, main = paste(nm.disease, ' Corrupt ICDonly, ', target))
+        # plot_data = c(plot_data, list(cv.fit))
+        plot_data = c(plot_data, list(lambda = lambda_vec, mse = mse_vec))
+        model.fit <- glmnet::glmnet(U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
+                                    lambda = lambda_vec[which.min(mse_vec)])
+
+        # score0 = U_new[, -c(id_target, id_elsetarget_corrupt)] %*% model.fit$beta
+        score0 = U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)] %*% model.fit$beta
+        rownames(model.fit$beta)[which(rownames(model.fit$beta) == nm.corrupt.vec[j])] = target.j
+        b.all0 <- as.vector(model.fit$beta); names(b.all0) = rownames(model.fit$beta)
         # b.all0 = solve(XTX + W) %*% XTY
-        b.all <- cbind(b.all, b.all0)
-        score = cbind(score, as.matrix(U_new %*% b.all0, ncol = 1))
+        b.all <- cbind(b.all, b.all0[match(names(b.all0), colnames(alpha_ma))])
+        # score = cbind(score, score0[match(rownames(score0), colnames(alpha_ma))])
+        score = cbind(score, score0)
       }
 
-      pca.score = stats::princomp(U %*% alpha_ma %*% b.all)
+      pca.score = stats::princomp(score)
       gamma = pca.score$loadings[,1]
 
       theta = alpha_ma %*% b.all %*% gamma
-      beta.all <- data.frame(`feat` = rownames(U), `theta` = theta)
+      beta.all <- data.frame(`feat` = colnames(alpha_ma), `theta` = theta)
       # beta.all$beta_ICD = beta.all$beta_NLP = NA
       # beta.all$beta_ICD[match(rownames(b.all), beta.all$feat)] = b.all[,1]
       # beta.all$beta_NLP[match(rownames(b.all), beta.all$feat)] = b.all[,2]
@@ -474,12 +533,15 @@ gen.KOMAP.est.table <- function(input.cov, nm.utl, nm.multi, target.code, target
 
 
 
-KOMAP.pred <- function(out, target.code, dat.part, nm.utl, nm.multi, nm.id = 'patient_num'){
+#' @import mclust
+KOMAP.pred.corrupt <- function(out, target.code, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id = 'patient_num'){
   pred.prob = data.frame(`patient_num` = dat.part[,nm.id])
   pred.cluster = data.frame(`patient_num` = dat.part[,nm.id])
   for(i in 1:length(out)){
     method = out[[i]]
     feat = method$beta$feat
+    # feat = setdiff(feat, c(nm.corrupt.code, nm.corrupt.cui))
+    # print(setdiff(feat,  colnames(dat.part)))
     feat = intersect(feat, colnames(dat.part))
     if(length(feat) == 1){
       dat.part.filter = data.frame(dat.part[, feat])
@@ -493,7 +555,6 @@ KOMAP.pred <- function(out, target.code, dat.part, nm.utl, nm.multi, nm.id = 'pa
       dat.part.filter = as.data.frame(cbind(dat.part[,nm.multi], dat.part.filter))
       colnames(dat.part.filter)[1] = nm.multi
     }
-
     b.all = data.frame(`coeff` = method$beta$theta, `feat` = method$beta$feat)
     b.all = b.all[b.all$feat %in% feat, ]
     S.norm <- as.matrix(dat.part.filter[,b.all$feat]) %*% matrix(b.all$coeff, ncol=1)
@@ -504,12 +565,9 @@ KOMAP.pred <- function(out, target.code, dat.part, nm.utl, nm.multi, nm.id = 'pa
     junk = mclust::Mclust(S.norm, G = 2, verbose = FALSE)
     cor1 = cor(dat.part[, target.code], junk$classification, method = 'kendall')
     cor2 = cor(dat.part[, target.code], 3-junk$classification, method = 'kendall')
-    # cluster_i = ifelse(cor1 > cor2, junk$classification - 1, 3 - junk$classification)
-    if(cor1 > cor2){
-      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease'))
-    }else{
-      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease'))
-    }
+    cluster_i = ifelse(cor1 > cor2,
+                       factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease')),
+                       factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease')))
     pred.cluster = cbind(pred.cluster, cluster_i)
   }
   colnames(pred.prob)[-1] = names(out)
