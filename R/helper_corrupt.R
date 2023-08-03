@@ -40,34 +40,64 @@ KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targ
     cuisearch.feature = nlp.feature
   }
   if(!is.wide){
-    input.cov = as.data.frame(input.cov)
-    unique.node = unique(c(input.cov[,1], input.cov[,2]))
-    colnames(input.cov) = c('from', 'to', 'cov')
+    input.cov.train = as.data.frame(input.cov.train)
+    unique.node = unique(c(input.cov.train[,1], input.cov.train[,2]))
+    colnames(input.cov.train) = c('from', 'to', 'cov')
 
-    input.cov.wide = stats::reshape(as.data.frame(input.cov), idvar = "from", timevar = "to",
+    input.cov.train.wide = stats::reshape(as.data.frame(input.cov.train), idvar = "from", timevar = "to",
                                     direction = "wide")
-    rownames(input.cov.wide) = input.cov.wide$from; input.cov.wide$from = NULL
-    colnames(input.cov.wide) = stringr::str_remove(colnames(input.cov.wide), '^cov\\.')
-    miss.row = setdiff(unique.node, rownames(input.cov.wide))
-    miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.wide))
-    rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.wide)
-    input.cov.wide = rbind(input.cov.wide, miss.row.matrix)
+    rownames(input.cov.train.wide) = input.cov.train.wide$from; input.cov.train.wide$from = NULL
+    colnames(input.cov.train.wide) = stringr::str_remove(colnames(input.cov.train.wide), '^cov\\.')
+    miss.row = setdiff(unique.node, rownames(input.cov.train.wide))
+    miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.train.wide))
+    rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.train.wide)
+    input.cov.train.wide = rbind(input.cov.train.wide, miss.row.matrix)
 
-    miss.col = setdiff(unique.node, colnames(input.cov.wide))
-    miss.col.matrix = matrix(NA, nrow = nrow(input.cov.wide), ncol = length(miss.col))
-    colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.wide)
-    input.cov.wide = cbind(input.cov.wide, miss.col.matrix)
+    miss.col = setdiff(unique.node, colnames(input.cov.train.wide))
+    miss.col.matrix = matrix(NA, nrow = nrow(input.cov.train.wide), ncol = length(miss.col))
+    colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.train.wide)
+    input.cov.train.wide = cbind(input.cov.train.wide, miss.col.matrix)
 
-    input.cov = input.cov.wide
-    input.cov.lower = input.cov[lower.tri(input.cov)]; input.cov.upper = input.cov[upper.tri(input.cov)]
-    if(all(is.na(input.cov.lower))){
-      input.cov[lower.tri(input.cov)] = input.cov[upper.tri(input.cov)]
+    input.cov.train = input.cov.train.wide
+    input.cov.train.lower = input.cov.train[lower.tri(input.cov.train)]; input.cov.train.upper = input.cov.train[upper.tri(input.cov.train)]
+    if(all(is.na(input.cov.train.lower))){
+      input.cov.train[lower.tri(input.cov.train)] = input.cov.train[upper.tri(input.cov.train)]
     }else{
-      if(all(is.na(input.cov.upper))){
-        input.cov[upper.tri(input.cov)] = input.cov[lower.tri(input.cov)]
+      if(all(is.na(input.cov.train.upper))){
+        input.cov.train[upper.tri(input.cov.train)] = input.cov.train[lower.tri(input.cov.train)]
       }
     }
-    input.cov[is.na(input.cov)] = 0
+    input.cov.train[is.na(input.cov.train)] = 0
+
+
+    input.cov.valid = as.data.frame(input.cov.valid)
+    unique.node = unique(c(input.cov.valid[,1], input.cov.valid[,2]))
+    colnames(input.cov.valid) = c('from', 'to', 'cov')
+
+    input.cov.valid.wide = stats::reshape(as.data.frame(input.cov.valid), idvar = "from", timevar = "to",
+                                          direction = "wide")
+    rownames(input.cov.valid.wide) = input.cov.valid.wide$from; input.cov.valid.wide$from = NULL
+    colnames(input.cov.valid.wide) = stringr::str_remove(colnames(input.cov.valid.wide), '^cov\\.')
+    miss.row = setdiff(unique.node, rownames(input.cov.valid.wide))
+    miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.valid.wide))
+    rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.valid.wide)
+    input.cov.valid.wide = rbind(input.cov.valid.wide, miss.row.matrix)
+
+    miss.col = setdiff(unique.node, colnames(input.cov.valid.wide))
+    miss.col.matrix = matrix(NA, nrow = nrow(input.cov.valid.wide), ncol = length(miss.col))
+    colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.valid.wide)
+    input.cov.valid.wide = cbind(input.cov.valid.wide, miss.col.matrix)
+
+    input.cov.valid = input.cov.valid.wide
+    input.cov.valid.lower = input.cov.valid[lower.tri(input.cov.valid)]; input.cov.valid.upper = input.cov.valid[upper.tri(input.cov.valid)]
+    if(all(is.na(input.cov.valid.lower))){
+      input.cov.valid[lower.tri(input.cov.valid)] = input.cov.valid[upper.tri(input.cov.valid)]
+    }else{
+      if(all(is.na(input.cov.valid.upper))){
+        input.cov.valid[upper.tri(input.cov.valid)] = input.cov.valid[lower.tri(input.cov.valid)]
+      }
+    }
+    input.cov.valid[is.na(input.cov.valid)] = 0
     message(paste0('\nInput long format data, transformed to wide format covariance matrix (',
                    length(unique.node),' unique nodes).'))
   }
@@ -389,10 +419,9 @@ gen.KOMAP.est.table.corrupt <- function(input.cov.train, input.cov.valid, nm.dis
         mse.fit = mean((U.valid[, id_target] - predict.valid.fit)^2)
         return(mse.fit)
       })
-      plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDonly, ', target))
-      abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
-      # plot(cv.fit, main = paste(nm.disease, ' Corrupt ICDonly, ', target))
-      # plot_data = c(plot_data, list(cv.fit))
+      # plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDonly, ', target))
+      # abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+
       plot_data = c(plot_data, list(lambda = lambda_vec, mse = mse_vec))
       model.fit <- glmnet::glmnet(U_new[, -id_target_corrupt], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
                                   lambda = lambda_vec[which.min(mse_vec)])
@@ -495,10 +524,9 @@ gen.KOMAP.est.table.corrupt <- function(input.cov.train, input.cov.valid, nm.dis
           mse.fit = mean((U.valid[, id_target] - predict.valid.fit)^2)
           return(mse.fit)
         })
-        plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDNLP, ', target.j))
-        abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
-        # plot(cv.fit, main = paste(nm.disease, ' Corrupt ICDonly, ', target))
-        # plot_data = c(plot_data, list(cv.fit))
+        # plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt ICDNLP, ', target.j))
+        # abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+
         plot_data = c(plot_data, list(lambda = lambda_vec, mse = mse_vec))
         model.fit <- glmnet::glmnet(U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
                                     lambda = lambda_vec[which.min(mse_vec)])
@@ -565,9 +593,12 @@ KOMAP.pred.corrupt <- function(out, target.code, dat.part, nm.utl, nm.corrupt.co
     junk = mclust::Mclust(S.norm, G = 2, verbose = FALSE)
     cor1 = cor(dat.part[, target.code], junk$classification, method = 'kendall')
     cor2 = cor(dat.part[, target.code], 3-junk$classification, method = 'kendall')
-    cluster_i = ifelse(cor1 > cor2,
-                       factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease')),
-                       factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease')))
+    # cluster_i = ifelse(cor1 > cor2, junk$classification - 1, 3 - junk$classification)
+    if(cor1 > cor2){
+      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease'))
+    }else{
+      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease'))
+    }
     pred.cluster = cbind(pred.cluster, cluster_i)
   }
   colnames(pred.prob)[-1] = names(out)

@@ -319,37 +319,3 @@ gen.KOMAP.est.table.corrupt.multi.target <- function(input.cov.train, input.cov.
 }
 
 
-
-
-KOMAP.pred.corrupt <- function(out, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id = 'patient_num'){
-  pred.prob = data.frame(`patient_num` = dat.part[,nm.id])
-  for(i in 1:length(out)){
-    method = out[[i]]
-    feat = method$beta$feat
-    # feat = setdiff(feat, c(nm.corrupt.code, nm.corrupt.cui))
-    # print(setdiff(feat,  colnames(dat.part)))
-    feat = intersect(feat, colnames(dat.part))
-    if(length(feat) == 1){
-      dat.part.filter = data.frame(dat.part[, feat])
-      colnames(dat.part.filter) = feat
-    }else{
-      dat.part.filter = dat.part[, feat]
-    }
-    dat.part.filter = as.data.frame(cbind(dat.part[,nm.utl], dat.part.filter))
-    colnames(dat.part.filter)[1] = nm.utl
-    if(!is.null(nm.multi)){
-      dat.part.filter = as.data.frame(cbind(dat.part[,nm.multi], dat.part.filter))
-      colnames(dat.part.filter)[1] = nm.multi
-    }
-    b.all = data.frame(`coeff` = method$beta$theta, `feat` = method$beta$feat)
-    b.all = b.all[b.all$feat %in% feat, ]
-    S.norm <- as.matrix(dat.part.filter[,b.all$feat]) %*% matrix(b.all$coeff, ncol=1)
-
-    ## Fit gaussian mixture model on S.norm, we only use the "length(nm.logS.ori) = 1" case:
-    fit = S.norm
-    pred.prob = cbind(pred.prob, fit)
-  }
-  colnames(pred.prob)[-1] = names(out)
-  return(stats::na.omit(pred.prob))
-}
-

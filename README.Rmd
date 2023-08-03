@@ -30,7 +30,7 @@ devtools::install_github("xinxiong0238/KOMAP")
 ```
 
 
-## Dara preprocessing
+## Data preprocessing
 
 ### Input covariance matrix (wide format)
 One of the KOMAP algorithm inputs is the covariance matrix of the clinical features (i.e., log(count+1)) derived from your target population. To obtain the covariance matrix, we start from the raw EHR records. Note in the stored fake ehr data, we only include 5 patients and 2 different ehr codes - lab code and diagnostic ICD code (DIAG-ICD9).
@@ -77,18 +77,32 @@ fake_ehr_count <- rbind(fake_ehr_count_loinc, fake_ehr_rollup_count_phecode)
 head(fake_ehr_count)
 ```
 
-Then we transform the data to the wide format, conduct logarithm transformation, and calculate the covariance matrix:
+Then we transform the data to the wide format, conduct logarithm transformation:
 ```{r}
 fake_ehr_count_wide <- tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_num'),
                                          names_from = 'concept_code', values_from = 'count')
 fake_ehr_count_wide[is.na(fake_ehr_count_wide)] <- 0
 fake_ehr_logcount_wide <- fake_ehr_count_wide
 fake_ehr_logcount_wide[,-1] <- log(fake_ehr_logcount_wide[, -1] + 1)
-fake_ehr_cov <- cov(fake_ehr_logcount_wide[, -1])
-fake_ehr_cov[1:3,1:3]
 ```
 
 Note that it may be beneficial to screen out patients who never have the diagnostic code of your target disease before calculating the covariance matrix. For example, if you are interesting in rheumatoid arthritis phenotyping task, it is suggested to focus on patients who had at least 1 count of `PheCode:714.1` in their EHR records.
+
+#### Corrupt main surrogate
+In order to fine tune the parameter from summary-level statistics, we need to construct corrupted surrogate features before calculating the covariance matrix. Specifically, for each main surrogate feature, we set 20% of data to be equal to the mean of the feature as if performing dropout training. Then we further split up the data into two parts (1/3 and 2/3) to construct training and validation covariance matrices:
+
+```{r}
+main_code = 'PheCode:250'
+fake_ehr_corrupt = as.data.frame(fake_ehr_logcount_wide)
+fake_ehr_corrupt$corrupt_mainICD = fake_ehr_corrupt[, main_code]
+fake_ehr_corrupt$corrupt_mainICD[sample(1:nrow(fake_ehr_corrupt), round(nrow(fake_ehr_corrupt) * 0.2), replace = FALSE)] = mean(as.matrix(fake_ehr_corrupt[, main_code]))
+
+id.train = sample(1:nrow(fake_ehr_corrupt), round(nrow(fake_ehr_corrupt) / 3 * 2))
+id.valid = setdiff(1:nrow(fake_ehr_corrupt), id.train)
+dat.cov.train = cov(fake_ehr_corrupt[id.train, ])
+dat.cov.valid = cov(fake_ehr_corrupt[id.valid, ])
+```
+
 
 ### One convenient function
 To wrap up the aforementioned preprocessing steps, the KOMAP package provides one function `gen_cov_input` with a raw longitudinal ehr data, one rollup dictionary and some frequency filters as the function input:
@@ -96,8 +110,9 @@ To wrap up the aforementioned preprocessing steps, the KOMAP package provides on
 data(ehr_data)
 data(rollup_dict)
 data(filter_df)
-input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
-input_cov[1:3, 1:3]
+input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates = 'PheCode:250', train_ratio = 1/2)
+input_cov$train_cov[1:3,1:3]
+input_cov$valid_cov[1:3,1:3]
 ```
 
 
@@ -106,7 +121,7 @@ input_cov[1:3, 1:3]
 You can also input the covariance matrix in a long format. The data must contain three columns with the first two indicating the node pair names. Note that when KOMAP tranforms the input to a wide format, it will assign 0 to missing pairwise covariance value. If you only input the lower/upper triangle part, the function will automatically fill the other side assuming symmetric covariance matrix. See an example below:
 
 ```{r}
-head(cov_RA_long)
+head(cov_RA_train_long)
 ```
 
 
@@ -181,9 +196,13 @@ This is a basic example of how to use the main function in the KOMAP package to 
 ```{r example}
 codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
 nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
-input.cov <- cov_RA_long
+input.cov.train <- cov_RA_train_long
+input.cov.valid <- cov_RA_valid_long
+
 target.code <- 'PheCode:714.1'
 target.cui <- 'C0003873'
+nm.corrupt.code <- 'corrupt_mainICD'
+nm.corrupt.cui <- 'corrupt_mainNLP'
 nm.utl <- 'utl'
 nm.pi <- 'pi'
 nm.id <- 'patient_num'
@@ -191,8 +210,10 @@ nm.y <- 'Y'
 dat.part <- dat_part
 
 ## When the input is in a long format:
-out_input_long <- KOMAP(input.cov, is.wide = FALSE, target.code, target.cui, nm.utl,
-                        nm.multi = NULL, dict_RA, pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+out_input_long <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = FALSE, target.code, target.cui, 
+                                nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                                nm.corrupt.cui = nm.corrupt.cui, dict_RA, pred = FALSE, 
+                                eval.real = FALSE, eval.sim = FALSE)
 ```
 If you do not specify `pred`, `eval.real` or `eval.sim` equal to be `TRUE`, then KOMAP only output the regression coefficients which can be used for disease scoring calculation with additional individual data. Inside the `est` output, the `long_df` data frame in the output pulls coefficients from different model settings together if any (e.g., only use main ICD as surrogate or use both main ICD and main NLP as surrogates), while `lst` organizes the regression output by model settings.
 
@@ -202,18 +223,23 @@ head(out_input_long$est$long_df)
 
 Similarly, you can input the covariance matrix in wide format:
 ```{r}
-input.cov = cov_RA
-out_0 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+input.cov.train <- cov_RA_train
+input.cov.valid <- cov_RA_valid
+out_0 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                nm.corrupt.cui = nm.corrupt.cui, dict_RA, pred = FALSE, 
+                eval.real = FALSE, eval.sim = FALSE)
 ```
 
 
 
 You can also specify a list of codified/narrative features that are relevant to the target disease. KOMAP will perform feature screening before regression:
 ```{r}
-out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,               
-             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+out_1 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 ```
 
 
@@ -221,10 +247,12 @@ out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 
 When specifying `eval.sim=TRUE` and input conditional mean vectors, conditional covaraince matrices and the prevalence value, KOMAP will return not only the regression coefficients, but also a simulated AUC that helps a grasp of model performance without any individual labeled data.
 ```{r}
-out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                            
-             pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-             mu0, mu1, var0, var1, prev_Y, B = 10000)
+out_2 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
+                       mu0, mu1, var0, var1, prev_Y, B = 10000)
 out_2$sim_eval
 ```
 
@@ -232,10 +260,12 @@ out_2$sim_eval
 When specifying `pred=TRUE` and input a group of individual data (i.e., log count of EHR features), KOMAP will return both the regression coefficients, predicted disease scores and predicted disease labels (using gaussian mixture model) for the input patients. Remember to specify the `nm.id` argument (unique patient id) to avoid score matching issue.
 ```{r}
 library(mclust)
-out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                          
-             pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
-             dat.part = dat.part, nm.id = nm.id)
+out_3 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
+                       dat.part = dat.part, nm.id = nm.id)
 head(out_3$pred_prob$pred.score)
 head(out_3$pred_prob$pred.cluster)
 ```
@@ -243,9 +273,11 @@ head(out_3$pred_prob$pred.cluster)
 ### Output regression coefficients and true AUC
 When specifying `eval.real=TRUE` and input a group of individual data (i.e., log count of EHR features) as well as their labels, KOMAP will return both the regression coefficients, and real AUC evaluated based on your gold label data. Remember to specify the `nm.y` argument (gold label for each patient). It will also aumatically return the predicted disease score for each patient.
 ```{r}
-out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                           
-             pred = FALSE, eval.real = TRUE, eval.sim = FALSE,
-             dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
+out_4 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = TRUE, eval.sim = FALSE,
+                       dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 out_4$real_eval
 ```

@@ -26,7 +26,7 @@ You can install the development version of KOMAP from
 devtools::install_github("xinxiong0238/KOMAP")
 ```
 
-## Dara preprocessing
+## Data preprocessing
 
 ### Input covariance matrix (wide format)
 
@@ -111,7 +111,7 @@ head(fake_ehr_count)
 ```
 
 Then we transform the data to the wide format, conduct logarithm
-transformation, and calculate the covariance matrix:
+transformation:
 
 ``` r
 fake_ehr_count_wide <- tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_num'),
@@ -119,12 +119,6 @@ fake_ehr_count_wide <- tidyr::pivot_wider(fake_ehr_count, id_cols = c('patient_n
 fake_ehr_count_wide[is.na(fake_ehr_count_wide)] <- 0
 fake_ehr_logcount_wide <- fake_ehr_count_wide
 fake_ehr_logcount_wide[,-1] <- log(fake_ehr_logcount_wide[, -1] + 1)
-fake_ehr_cov <- cov(fake_ehr_logcount_wide[, -1])
-fake_ehr_cov[1:3,1:3]
-#>              LOINC:1742-6 LOINC:1920-8 LOINC:1975-2
-#> LOINC:1742-6   0.41764272  -0.04620953  -0.15587476
-#> LOINC:1920-8  -0.04620953   0.11930231   0.08004193
-#> LOINC:1975-2  -0.15587476   0.08004193   0.34109280
 ```
 
 Note that it may be beneficial to screen out patients who never have the
@@ -132,6 +126,27 @@ diagnostic code of your target disease before calculating the covariance
 matrix. For example, if you are interesting in rheumatoid arthritis
 phenotyping task, it is suggested to focus on patients who had at least
 1 count of `PheCode:714.1` in their EHR records.
+
+#### Corrupt main surrogate
+
+In order to fine tune the parameter from summary-level statistics, we
+need to construct corrupted surrogate features before calculating the
+covariance matrix. Specifically, for each main surrogate feature, we set
+20% of data to be equal to the mean of the feature as if performing
+dropout training. Then we further split up the data into two parts (1/3
+and 2/3) to construct training and validation covariance matrices:
+
+``` r
+main_code = 'PheCode:250'
+fake_ehr_corrupt = as.data.frame(fake_ehr_logcount_wide)
+fake_ehr_corrupt$corrupt_mainICD = fake_ehr_corrupt[, main_code]
+fake_ehr_corrupt$corrupt_mainICD[sample(1:nrow(fake_ehr_corrupt), round(nrow(fake_ehr_corrupt) * 0.2), replace = FALSE)] = mean(as.matrix(fake_ehr_corrupt[, main_code]))
+
+id.train = sample(1:nrow(fake_ehr_corrupt), round(nrow(fake_ehr_corrupt) / 3 * 2))
+id.valid = setdiff(1:nrow(fake_ehr_corrupt), id.train)
+dat.cov.train = cov(fake_ehr_corrupt[id.train, ])
+dat.cov.valid = cov(fake_ehr_corrupt[id.valid, ])
+```
 
 ### One convenient function
 
@@ -143,12 +158,17 @@ one rollup dictionary and some frequency filters as the function input:
 data(ehr_data)
 data(rollup_dict)
 data(filter_df)
-input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
-input_cov[1:3, 1:3]
-#>                  LAB-LOINC:1742-6 LAB-LOINC:1920-8 LAB-LOINC:1975-2
-#> LAB-LOINC:1742-6       0.39235376      -0.04103243       -0.3317790
-#> LAB-LOINC:1920-8      -0.04103243       0.15649504        0.1222289
-#> LAB-LOINC:1975-2      -0.33177901       0.12222891        0.3614025
+input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates = 'PheCode:250', train_ratio = 1/2)
+input_cov$train_cov[1:3,1:3]
+#>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
+#> corrupt_PheCode:250           0.2402265        0.4341746       0.14052350
+#> LAB-LOINC:1742-6              0.4341746        0.7847075       0.25397584
+#> LAB-LOINC:1920-8              0.1405235        0.2539758       0.08220098
+input_cov$valid_cov[1:3,1:3]
+#>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
+#> corrupt_PheCode:250          0.01501416                0      -0.01933392
+#> LAB-LOINC:1742-6             0.00000000                0       0.00000000
+#> LAB-LOINC:1920-8            -0.01933392                0       0.02489652
 ```
 
 ### Input covariance matrix (long format)
@@ -161,16 +181,16 @@ lower/upper triangle part, the function will automatically fill the
 other side assuming symmetric covariance matrix. See an example below:
 
 ``` r
-head(cov_RA_long)
+head(cov_RA_train_long)
 #> # A tibble: 6 × 3
-#>   from  to                   cov
-#>   <chr> <chr>              <dbl>
-#> 1 utl   utl             1.02    
-#> 2 utl   PheCode:714.1   0.319   
-#> 3 utl   C0003873        0.359   
-#> 4 utl   C0549206        0.122   
-#> 5 utl   RXNORM:32624    0.0258  
-#> 6 utl   PheCode:286.11 -0.000248
+#>   from  to                cov
+#>   <chr> <chr>           <dbl>
+#> 1 utl   utl             1.03 
+#> 2 utl   PheCode:714.1   0.317
+#> 3 utl   C0003873        0.341
+#> 4 utl   corrupt_mainNLP 0.287
+#> 5 utl   corrupt_mainICD 0.243
+#> 6 utl   C0003243        0.343
 ```
 
 ### Input feature filters (optional)
@@ -290,9 +310,13 @@ with built-in toy rheumatoid arthritis data.
 ``` r
 codify.feature <- codify_RA$Variable[codify_RA$high_confidence_level == 1]
 nlp.feature <- cui_RA$cui[cui_RA$high_confidence_level == 1]
-input.cov <- cov_RA_long
+input.cov.train <- cov_RA_train_long
+input.cov.valid <- cov_RA_valid_long
+
 target.code <- 'PheCode:714.1'
 target.cui <- 'C0003873'
+nm.corrupt.code <- 'corrupt_mainICD'
+nm.corrupt.cui <- 'corrupt_mainNLP'
 nm.utl <- 'utl'
 nm.pi <- 'pi'
 nm.id <- 'patient_num'
@@ -300,12 +324,14 @@ nm.y <- 'Y'
 dat.part <- dat_part
 
 ## When the input is in a long format:
-out_input_long <- KOMAP(input.cov, is.wide = FALSE, target.code, target.cui, nm.utl,
-                        nm.multi = NULL, dict_RA, pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+out_input_long <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = FALSE, target.code, target.cui, 
+                                nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                                nm.corrupt.cui = nm.corrupt.cui, dict_RA, pred = FALSE, 
+                                eval.real = FALSE, eval.sim = FALSE)
 #> 
-#> Input long format data, transformed to wide format covariance matrix (42 unique nodes).
+#> Input long format data, transformed to wide format covariance matrix (45 unique nodes).
 #> Check feature format in `input.cov`...
-#> Num of total feat: 42
+#> Num of total feat: 45
 #> 
 #> Finish estimating coefficients.
 ```
@@ -321,30 +347,33 @@ settings.
 
 ``` r
 head(out_input_long$est$long_df)
-#>          disease               method        target          feat
-#> 1: PheCode:714.1 mainICD + allfeature PheCode:714.1 PheCode:714.1
-#> 2: PheCode:714.1 mainICD + allfeature PheCode:714.1           utl
-#> 3: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0003873
-#> 4: PheCode:714.1 mainICD + allfeature PheCode:714.1      C1959609
-#> 5: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0919386
-#> 6: PheCode:714.1 mainICD + allfeature PheCode:714.1      C0409651
-#>                                 desc       coeff
-#> 1:              rheumatoid arthritis  0.67831962
-#> 2:                Healthcare Utility -0.21875372
-#> 3:              Rheumatoid Arthritis  0.15097257
-#> 4:                    Erosion lesion  0.04129051
-#> 5:               Pathology procedure -0.03343481
-#> 6: Seropositive rheumatoid arthritis  0.03003230
+#>          disease           method        target            feat
+#> 1: PheCode:714.1 mainICD + codify PheCode:714.1   PheCode:714.1
+#> 2: PheCode:714.1 mainICD + codify PheCode:714.1             utl
+#> 3: PheCode:714.1 mainICD + codify PheCode:714.1        C0003873
+#> 4: PheCode:714.1 mainICD + codify PheCode:714.1        C0039103
+#> 5: PheCode:714.1 mainICD + codify PheCode:714.1 corrupt_mainNLP
+#> 6: PheCode:714.1 mainICD + codify PheCode:714.1   RXNORM:214555
+#>                    desc       coeff
+#> 1: rheumatoid arthritis  0.62534522
+#> 2:   Healthcare Utility -0.20183315
+#> 3: Rheumatoid Arthritis  0.13551503
+#> 4:            Synovitis  0.05149573
+#> 5:                 <NA>  0.04541547
+#> 6:           etanercept  0.03955847
 ```
 
 Similarly, you can input the covariance matrix in wide format:
 
 ``` r
-input.cov = cov_RA
-out_0 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+input.cov.train <- cov_RA_train
+input.cov.valid <- cov_RA_valid
+out_0 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                nm.corrupt.cui = nm.corrupt.cui, dict_RA, pred = FALSE, 
+                eval.real = FALSE, eval.sim = FALSE)
 #> Check feature format in `input.cov`...
-#> Num of total feat: 184
+#> Num of total feat: 186
 #> 
 #> Finish estimating coefficients.
 ```
@@ -354,11 +383,13 @@ relevant to the target disease. KOMAP will perform feature screening
 before regression:
 
 ``` r
-out_1 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,               
-             pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
+out_1 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = FALSE, eval.sim = FALSE)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 184
+#> Num of total feat: 186
 #> Num of selected codify feat: 48
 #> Num of selected codify feat after intersection: 37
 #> Num of selected NLP feat: 71
@@ -388,12 +419,14 @@ that helps a grasp of model performance without any individual labeled
 data.
 
 ``` r
-out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                            
-             pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-             mu0, mu1, var0, var1, prev_Y, B = 10000)
+out_2 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
+                       mu0, mu1, var0, var1, prev_Y, B = 10000)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 184
+#> Num of total feat: 186
 #> Num of selected codify feat: 48
 #> Num of selected codify feat after intersection: 37
 #> Num of selected NLP feat: 71
@@ -415,8 +448,8 @@ out_2 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> Finish estimating AUC.
 out_2$sim_eval
 #>                      method       auc
-#> 1          mainICD + codify 0.9499877
-#> 2 mainICDNLP + codify & NLP 0.9690431
+#> 1          mainICD + codify 0.9521138
+#> 2 mainICDNLP + codify & NLP 0.9681361
 ```
 
 ### Output regression coefficients and predicted disease scores
@@ -432,12 +465,14 @@ issue.
 library(mclust)
 #> Package 'mclust' version 5.4.9
 #> Type 'citation("mclust")' for citing this R package in publications.
-out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                          
-             pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
-             dat.part = dat.part, nm.id = nm.id)
+out_3 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
+                       dat.part = dat.part, nm.id = nm.id)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 184
+#> Num of total feat: 186
 #> Num of selected codify feat: 48
 #> Num of selected codify feat after intersection: 37
 #> Num of selected NLP feat: 71
@@ -459,12 +494,12 @@ out_3 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> Finish predicting scores.
 head(out_3$pred_prob$pred.score)
 #>    patient_num mainICD + codify mainICDNLP + codify & NLP
-#> 3           s1        0.4132152                -1.1677991
-#> 5           s2       -0.2087015                 0.4529423
-#> 6           s3       -1.2699338                -2.6168660
-#> 10          s4       -0.6606499                -1.4898302
-#> 13          s5        0.2164402                 0.2210345
-#> 20          s6       -0.7194731                -0.3074381
+#> 3           s1        0.3395238                -1.1684983
+#> 5           s2       -0.2155562                 0.5633155
+#> 6           s3       -1.4744844                -2.5441391
+#> 10          s4       -0.7760274                -1.4015885
+#> 13          s5        0.1699729                 0.3269727
+#> 20          s6       -0.8280096                -0.1911863
 head(out_3$pred_prob$pred.cluster)
 #>    patient_num mainICD + codify mainICDNLP + codify & NLP
 #> 3           s1          disease                no disease
@@ -485,12 +520,14 @@ label for each patient). It will also aumatically return the predicted
 disease score for each patient.
 
 ``` r
-out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.multi = NULL, dict_RA,
-             codify.feature, nlp.feature,                           
-             pred = FALSE, eval.real = TRUE, eval.sim = FALSE,
-             dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
+out_4 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
+                       nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
+                       nm.corrupt.cui = nm.corrupt.cui, dict_RA, 
+                       codify.feature = codify.feature, nlp.feature = nlp.feature,
+                       pred = FALSE, eval.real = TRUE, eval.sim = FALSE,
+                       dat.part = dat.part, nm.id = nm.id, nm.pi = nm.pi, nm.y = nm.y)
 #> Check feature format in `input.cov`, `codify.feature` and/or `cuisearch.feature`...
-#> Num of total feat: 184
+#> Num of total feat: 186
 #> Num of selected codify feat: 48
 #> Num of selected codify feat after intersection: 37
 #> Num of selected NLP feat: 71
@@ -512,6 +549,6 @@ out_4 <- KOMAP(input.cov, is.wide = TRUE, target.code, target.cui, nm.utl, nm.mu
 #> Finish evaluating model prediction.
 out_4$real_eval
 #>                      method       auc F_score_max
-#> 1          mainICD + codify 0.9370693   0.8762717
-#> 2 mainICDNLP + codify & NLP 0.9588487   0.8904735
+#> 1          mainICD + codify 0.9364308   0.8669107
+#> 2 mainICDNLP + codify & NLP 0.9581666   0.8904735
 ```

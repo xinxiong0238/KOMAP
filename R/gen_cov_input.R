@@ -3,6 +3,8 @@
 #' @param ehr_data Raw EHR data records with 3 colnames indicating the unique patient id, the number of days since admission and the concept code. Must be in order.
 #' @param rollup_dict Dataframe with the first column indicating the raw code (e.g., ICD code) and the second the rolled-up group code (e.g., phecode). Can be \code{NULL} if no rollup is needed.
 #' @param filter_df Dataframe with the first column indicating the concept code and the second indicating the least frequency that is required for patients to be included. Multiple filters are allowed by specifying different rows. Can be \code{NULL} if no filter is needed.
+#' @param main_surrogates A vector of surrogate names which are to be corrupted.
+#' @param train_ratio A number indicating the ratio of training data over full data size. The trianing and valid data are used to construct covariance matrices for parameter tuning.
 #' Note that the code count calculation for each patient includes two steps. First, we calculate the raw concept count once per day for each patient(i.e., for those raw codes that show up more than one time in a day, treat as one time). Second, the rolled-up group code count is equal to the sum of all its descendant code once-per-day count.
 #' @returns A covariance matrix.
 #' @examples
@@ -12,7 +14,7 @@
 #' input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df)
 #' @export
 #' @importFrom rlang .data
-gen_cov_input <- function(ehr_data, rollup_dict, filter_df){
+gen_cov_input <- function(ehr_data, rollup_dict, filter_df, main_surrogates, train_ratio){
   colnames(ehr_data) <- c('patient_num', 'days_since_admission', 'code')
   colnames(filter_df) <- c('code', 'freq')
 
@@ -51,8 +53,20 @@ gen_cov_input <- function(ehr_data, rollup_dict, filter_df){
     }
   }
 
-  ehr_logcount_wide <- ehr_count_wide
+  ehr_logcount_wide <- as.data.frame(ehr_count_wide)
   ehr_logcount_wide[,-1] <- log(ehr_logcount_wide[, -1] + 1)
-  ehr_cov <- stats::cov(ehr_logcount_wide[, -1])
-  return(ehr_cov)
+  ehr_logcount_wide$patient_num = NULL
+  for(surrogate in main_surrogates){
+    junk = ehr_logcount_wide[, surrogate]
+    junk[sample(1:nrow(ehr_logcount_wide), round(nrow(ehr_logcount_wide) * 0.2), replace = FALSE)] =
+      mean(junk)
+    ehr_logcount_wide = cbind(junk, ehr_logcount_wide)
+  }
+
+  colnames(ehr_logcount_wide)[1:length(main_surrogates)] = paste0('corrupt_', rev(main_surrogates))
+  id.train = sample(1:nrow(ehr_logcount_wide), round(nrow(ehr_logcount_wide) * train_ratio))
+  id.valid = setdiff(1:nrow(ehr_logcount_wide), id.train)
+  dat.cov.train = stats::cov(ehr_logcount_wide[id.train, ])
+  dat.cov.valid = stats::cov(ehr_logcount_wide[id.valid, ])
+  return(list(`train_cov` = dat.cov.train, `valid_cov` = dat.cov.valid))
 }
