@@ -3,6 +3,7 @@
 export("%>%")
 export(KOMAP)
 export(KOMAP_corrupt)
+export(KOMAP_corrupt_multi_target)
 export(gen_cov_input)
 import(mclust)
 importFrom(magrittr,"%>%")

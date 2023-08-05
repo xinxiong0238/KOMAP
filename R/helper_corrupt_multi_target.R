@@ -21,6 +21,7 @@
 #' @param nm.y The column name of labels in \code{gold.label}. Must be provided if \code{eval.real}=\code{TRUE}.
 #' @returns A list containing estimation and/or prediction and/or evaluation results by running KOMAP.
 #' @importFrom rlang .data
+#' @export
 KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targets, related.feature,
                           nm.disease, nm.utl, nm.corrupts,
                           dict = NULL, pred = FALSE, eval.real = FALSE, eval.sim = TRUE,

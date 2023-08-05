@@ -4,14 +4,18 @@
 \alias{gen_cov_input}
 \title{Generate covariance matrix from individual ehr data}
 \usage{
-gen_cov_input(ehr_data, rollup_dict, filter_df)
+gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates, train_ratio)
 }
 \arguments{
 \item{ehr_data}{Raw EHR data records with 3 colnames indicating the unique patient id, the number of days since admission and the concept code. Must be in order.}
 
 \item{rollup_dict}{Dataframe with the first column indicating the raw code (e.g., ICD code) and the second the rolled-up group code (e.g., phecode). Can be \code{NULL} if no rollup is needed.}
 
-\item{filter_df}{Dataframe with the first column indicating the concept code and the second indicating the least frequency that is required for patients to be included. Multiple filters are allowed by specifying different rows. Can be \code{NULL} if no filter is needed.
+\item{filter_df}{Dataframe with the first column indicating the concept code and the second indicating the least frequency that is required for patients to be included. Multiple filters are allowed by specifying different rows. Can be \code{NULL} if no filter is needed.}
+
+\item{main_surrogates}{A vector of surrogate names which are to be corrupted.}
+
+\item{train_ratio}{A number indicating the ratio of training data over full data size. The trianing and valid data are used to construct covariance matrices for parameter tuning.
 Note that the code count calculation for each patient includes two steps. First, we calculate the raw concept count once per day for each patient(i.e., for those raw codes that show up more than one time in a day, treat as one time). Second, the rolled-up group code count is equal to the sum of all its descendant code once-per-day count.}
 }
 \value{
