@@ -283,13 +283,13 @@ gen.KOMAP.est.table.corrupt.multi.target <- function(input.cov.train, input.cov.
         mse.fit = mean((U.valid[, id_target] - predict.valid.fit)^2)
         return(mse.fit)
       })
-      if(length(out_targets) == 1){
-        plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt single, ', target.j))
-        abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
-      }else{
-        plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt multiple, ', target.j))
-        abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
-      }
+      # if(length(out_targets) == 1){
+      #   plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt single, ', target.j))
+      #   abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+      # }else{
+      #   plot(log(lambda_vec), mse_vec, type = 'l', main = paste(nm.disease, ' Corrupt multiple, ', target.j))
+      #   abline(v = log(lambda_vec[which.min(mse_vec)]), col = 'red')
+      # }
       plot_data = c(plot_data, list(lambda = lambda_vec, mse = mse_vec))
       model.fit <- glmnet::glmnet(U_new[, -c(id_target_corrupt, id_elsetarget_corrupt)], Y, intercept = F, alpha = alpha.glmnent, standardize = F,
                                   lambda = lambda_vec[which.min(mse_vec)])
