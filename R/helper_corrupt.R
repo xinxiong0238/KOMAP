@@ -25,8 +25,8 @@
 #' @returns A list containing estimation and/or prediction and/or evaluation results by running KOMAP.
 #' @export
 #' @importFrom rlang .data
-KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, nm.disease,
-                          nm.utl, nm.corrupt.code, nm.corrupt.cui,
+KOMAP_corrupt <- function(input.cov.train, input.cov.valid = NULL, is.wide = TRUE, target.code, target.cui, nm.disease,
+                          nm.utl, nm.corrupt.code = NULL, nm.corrupt.cui = NULL,
                           nm.multi = NULL, dict = NULL,
                           codify.feature = NULL, nlp.feature = NULL,
                           pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
@@ -45,7 +45,7 @@ KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targ
     colnames(input.cov.train) = c('from', 'to', 'cov')
 
     input.cov.train.wide = stats::reshape(as.data.frame(input.cov.train), idvar = "from", timevar = "to",
-                                    direction = "wide")
+                                          direction = "wide")
     rownames(input.cov.train.wide) = input.cov.train.wide$from; input.cov.train.wide$from = NULL
     colnames(input.cov.train.wide) = stringr::str_remove(colnames(input.cov.train.wide), '^cov\\.')
     miss.row = setdiff(unique.node, rownames(input.cov.train.wide))
@@ -69,48 +69,54 @@ KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targ
     }
     input.cov.train[is.na(input.cov.train)] = 0
 
+    if(!(all(colnames(input.cov.train) %in% c(nm.utl, target.code)) & ncol(input.cov.train) == 2)){
+      input.cov.valid = as.data.frame(input.cov.valid)
+      unique.node = unique(c(input.cov.valid[,1], input.cov.valid[,2]))
+      colnames(input.cov.valid) = c('from', 'to', 'cov')
 
-    input.cov.valid = as.data.frame(input.cov.valid)
-    unique.node = unique(c(input.cov.valid[,1], input.cov.valid[,2]))
-    colnames(input.cov.valid) = c('from', 'to', 'cov')
+      input.cov.valid.wide = stats::reshape(as.data.frame(input.cov.valid), idvar = "from", timevar = "to",
+                                            direction = "wide")
+      rownames(input.cov.valid.wide) = input.cov.valid.wide$from; input.cov.valid.wide$from = NULL
+      colnames(input.cov.valid.wide) = stringr::str_remove(colnames(input.cov.valid.wide), '^cov\\.')
+      miss.row = setdiff(unique.node, rownames(input.cov.valid.wide))
+      miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.valid.wide))
+      rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.valid.wide)
+      input.cov.valid.wide = rbind(input.cov.valid.wide, miss.row.matrix)
 
-    input.cov.valid.wide = stats::reshape(as.data.frame(input.cov.valid), idvar = "from", timevar = "to",
-                                          direction = "wide")
-    rownames(input.cov.valid.wide) = input.cov.valid.wide$from; input.cov.valid.wide$from = NULL
-    colnames(input.cov.valid.wide) = stringr::str_remove(colnames(input.cov.valid.wide), '^cov\\.')
-    miss.row = setdiff(unique.node, rownames(input.cov.valid.wide))
-    miss.row.matrix = matrix(NA, nrow = length(miss.row), ncol = ncol(input.cov.valid.wide))
-    rownames(miss.row.matrix) = miss.row; colnames(miss.row.matrix) = colnames(input.cov.valid.wide)
-    input.cov.valid.wide = rbind(input.cov.valid.wide, miss.row.matrix)
+      miss.col = setdiff(unique.node, colnames(input.cov.valid.wide))
+      miss.col.matrix = matrix(NA, nrow = nrow(input.cov.valid.wide), ncol = length(miss.col))
+      colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.valid.wide)
+      input.cov.valid.wide = cbind(input.cov.valid.wide, miss.col.matrix)
 
-    miss.col = setdiff(unique.node, colnames(input.cov.valid.wide))
-    miss.col.matrix = matrix(NA, nrow = nrow(input.cov.valid.wide), ncol = length(miss.col))
-    colnames(miss.col.matrix) = miss.col; rownames(miss.col.matrix) = rownames(input.cov.valid.wide)
-    input.cov.valid.wide = cbind(input.cov.valid.wide, miss.col.matrix)
-
-    input.cov.valid = input.cov.valid.wide
-    input.cov.valid.lower = input.cov.valid[lower.tri(input.cov.valid)]; input.cov.valid.upper = input.cov.valid[upper.tri(input.cov.valid)]
-    if(all(is.na(input.cov.valid.lower))){
-      input.cov.valid[lower.tri(input.cov.valid)] = input.cov.valid[upper.tri(input.cov.valid)]
-    }else{
-      if(all(is.na(input.cov.valid.upper))){
-        input.cov.valid[upper.tri(input.cov.valid)] = input.cov.valid[lower.tri(input.cov.valid)]
+      input.cov.valid = input.cov.valid.wide
+      input.cov.valid.lower = input.cov.valid[lower.tri(input.cov.valid)]; input.cov.valid.upper = input.cov.valid[upper.tri(input.cov.valid)]
+      if(all(is.na(input.cov.valid.lower))){
+        input.cov.valid[lower.tri(input.cov.valid)] = input.cov.valid[upper.tri(input.cov.valid)]
+      }else{
+        if(all(is.na(input.cov.valid.upper))){
+          input.cov.valid[upper.tri(input.cov.valid)] = input.cov.valid[lower.tri(input.cov.valid)]
+        }
       }
+      input.cov.valid[is.na(input.cov.valid)] = 0
     }
-    input.cov.valid[is.na(input.cov.valid)] = 0
     message(paste0('\nInput long format data, transformed to wide format covariance matrix (',
                    length(unique.node),' unique nodes).'))
   }
-  ### Check user's input
-  if(!is.null(codify.feature) | !is.null(cuisearch.feature)){
-    KOMAP.est.check(input.cov.train, target.code, target.cui, nm.utl,
-                    codify.feature, cuisearch.feature)
+
+  if(all(colnames(input.cov.train) %in% c(nm.utl, target.code)) & ncol(input.cov.train) == 2){
+    out_main = KOMAP.est.step1(input.cov.train, target.code, nm.utl, dict)
   }else{
-    KOMAP.est.check.part(input.cov.train, target.code, target.cui, nm.utl)
+    ### Check user's input
+    if(!is.null(codify.feature) | !is.null(cuisearch.feature)){
+      KOMAP.est.check(input.cov.train, target.code, target.cui, nm.utl,
+                      codify.feature, cuisearch.feature)
+    }else{
+      KOMAP.est.check.part(input.cov.train, target.code, target.cui, nm.utl)
+    }
+    out_main = KOMAP.est.corrupt(input.cov.train, input.cov.valid, target.code, target.cui, nm.disease,
+                                 nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, dict,
+                                 codify.feature, cuisearch.feature)
   }
-  out_main = KOMAP.est.corrupt(input.cov.train, input.cov.valid, target.code, target.cui, nm.disease,
-                               nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, dict,
-                               codify.feature, cuisearch.feature)
   message('\nFinish estimating coefficients.')
   out = out_main$lst
   method_nm = names(out)
@@ -154,6 +160,51 @@ KOMAP_corrupt <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targ
   }
   options(warn = oldw)
   return(out_return)
+}
+
+KOMAP.est.step1 <- function(input.cov.train, target.code, nm.utl, dict){
+
+  alpha.glmnent = 0.15
+  method =  list(`feat` = colnames(input.cov.train),
+                 `target` = target.code)
+  target = target.code
+  U = svd(input.cov.train)
+  U = t(U$u %*% sqrt(diag(U$d)))
+  colnames(U) = rownames(U) = colnames(input.cov.train)
+  reg1 = stats::lm(U[, target] ~ 0 + U[, nm.utl])
+  U_new = U; U_new[, target] = reg1$residuals
+  alpha = reg1$coefficients
+  alpha_ma = c(1, -alpha)
+  beta.all <- data.frame(`feat` = c(target.code, nm.utl),
+                         `theta` = as.vector(alpha_ma))
+  method$beta = beta.all
+  out = c(`mainICD + utl` = list(method))
+
+  out.df = sapply(1:length(out), function(i){
+    a = data.frame(`disease` = target.code,
+                   `method` = names(out)[i],
+                   `target` = paste0(out[[i]]$target, collapse = ', '),
+                   `feat` = out[[i]]$beta$feat,
+                   `coeff` = out[[i]]$beta$theta)
+    return(a)
+  }, simplify = FALSE)
+  out.all = out.re = data.table::rbindlist(out.df)
+  if(!is.null(dict)){
+    out.all$desc = dict[match(out.all$feat, dict[,1]),2]
+    out.all = out.all[,c('disease', 'method', 'target', 'feat', 'desc', 'coeff')]
+    out.all$coeff = as.numeric(out.all$coeff)
+    out.all = out.all[order(out.all$coeff, decreasing = TRUE), ]
+    out.all$desc[out.all$feat == nm.utl] = 'Healthcare Utility'
+  }else{
+    out.all$desc = NA
+    out.all = out.all[,c('disease', 'method', 'target', 'feat', 'desc', 'coeff')]
+    out.all$coeff = as.numeric(out.all$coeff)
+    out.all = out.all[order(out.all$coeff, decreasing = TRUE), ]
+    out.all$desc[out.all$feat == nm.utl] = 'Healthcare Utility'
+  }
+  out.all = out.all %>% dplyr::arrange(.data$disease,.data$ method, -abs(.data$coeff))
+  return(list(`long_df` = out.all,
+              `lst` = out))
 }
 
 

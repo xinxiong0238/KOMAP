@@ -161,14 +161,14 @@ data(filter_df)
 input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates = 'PheCode:250', train_ratio = 1/2)
 input_cov$train_cov[1:3,1:3]
 #>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
-#> corrupt_PheCode:250           0.2402265        0.4341746       0.14052350
-#> LAB-LOINC:1742-6              0.4341746        0.7847075       0.25397584
-#> LAB-LOINC:1920-8              0.1405235        0.2539758       0.08220098
+#> corrupt_PheCode:250                   0                0        0.0000000
+#> LAB-LOINC:1742-6                      0                0        0.0000000
+#> LAB-LOINC:1920-8                      0                0        0.2402265
 input_cov$valid_cov[1:3,1:3]
 #>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
-#> corrupt_PheCode:250          0.01501416                0      -0.01933392
-#> LAB-LOINC:1742-6             0.00000000                0       0.00000000
-#> LAB-LOINC:1920-8            -0.01933392                0       0.02489652
+#> corrupt_PheCode:250          0.01501416        0.1085436      -0.04425967
+#> LAB-LOINC:1742-6             0.10854364        0.7847075      -0.31997171
+#> LAB-LOINC:1920-8            -0.04425967       -0.3199717       0.13047141
 ```
 
 ### Input covariance matrix (long format)
@@ -238,7 +238,7 @@ fake_ehr_label_logcount_wide[1:3,1:5]
 #> 3 0         179     1.791759    0.0000000     1.098612
 ```
 
-The conditional statistics are derived based on this label column.
+The conditional statistics are derived based on this labeling column.
 
 ``` r
 fake_ehr_var0 = cov(fake_ehr_label_logcount_wide %>% filter(Y == 0) %>% select(-c(Y, patient_num)))
@@ -355,7 +355,7 @@ head(out_input_long$est$long_df)
 #> 5: PheCode:714.1 mainICD + codify PheCode:714.1 corrupt_mainNLP
 #> 6: PheCode:714.1 mainICD + codify PheCode:714.1   RXNORM:214555
 #>                    desc       coeff
-#> 1: rheumatoid arthritis  0.62534522
+#> 1: rheumatoid arthritis  0.62534523
 #> 2:   Healthcare Utility -0.20183315
 #> 3: Rheumatoid Arthritis  0.13551503
 #> 4:            Synovitis  0.05149573
@@ -463,7 +463,7 @@ issue.
 
 ``` r
 library(mclust)
-#> Package 'mclust' version 5.4.9
+#> Package 'mclust' version 6.0.0
 #> Type 'citation("mclust")' for citing this R package in publications.
 out_3 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 
                        nm.disease = 'RA', nm.utl, nm.multi = NULL, nm.corrupt.code = nm.corrupt.code, 
