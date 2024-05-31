@@ -161,14 +161,14 @@ data(filter_df)
 input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates = 'PheCode:250', train_ratio = 1/2)
 input_cov$train_cov[1:3,1:3]
 #>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
-#> corrupt_PheCode:250                   0                0        0.0000000
-#> LAB-LOINC:1742-6                      0                0        0.0000000
-#> LAB-LOINC:1920-8                      0                0        0.2402265
+#> corrupt_PheCode:250          0.13512741        0.3256309      -0.07477726
+#> LAB-LOINC:1742-6             0.32563092        0.7847075      -0.18019872
+#> LAB-LOINC:1920-8            -0.07477726       -0.1801987       0.04138049
 input_cov$valid_cov[1:3,1:3]
 #>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
-#> corrupt_PheCode:250          0.01501416        0.1085436      -0.04425967
-#> LAB-LOINC:1742-6             0.10854364        0.7847075      -0.31997171
-#> LAB-LOINC:1920-8            -0.04425967       -0.3199717       0.13047141
+#> corrupt_PheCode:250                   0                0        0.0000000
+#> LAB-LOINC:1742-6                      0                0        0.0000000
+#> LAB-LOINC:1920-8                      0                0        0.4197944
 ```
 
 ### Input covariance matrix (long format)
@@ -348,6 +348,7 @@ settings.
 ``` r
 head(out_input_long$est$long_df)
 #>          disease           method        target            feat
+#>           <char>           <char>        <char>          <char>
 #> 1: PheCode:714.1 mainICD + codify PheCode:714.1   PheCode:714.1
 #> 2: PheCode:714.1 mainICD + codify PheCode:714.1             utl
 #> 3: PheCode:714.1 mainICD + codify PheCode:714.1        C0003873
@@ -355,6 +356,7 @@ head(out_input_long$est$long_df)
 #> 5: PheCode:714.1 mainICD + codify PheCode:714.1 corrupt_mainNLP
 #> 6: PheCode:714.1 mainICD + codify PheCode:714.1   RXNORM:214555
 #>                    desc       coeff
+#>                  <char>       <num>
 #> 1: rheumatoid arthritis  0.62534523
 #> 2:   Healthcare Utility -0.20183315
 #> 3: Rheumatoid Arthritis  0.13551503
@@ -500,6 +502,8 @@ head(out_3$pred_prob$pred.score)
 #> 10          s4       -0.7760274                -1.4015885
 #> 13          s5        0.1699729                 0.3269727
 #> 20          s6       -0.8280096                -0.1911863
+head(out_3$pred_prob$pred.prob)
+#> NULL
 head(out_3$pred_prob$pred.cluster)
 #>    patient_num mainICD + codify mainICDNLP + codify & NLP
 #> 3           s1          disease                no disease

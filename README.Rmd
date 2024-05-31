@@ -267,6 +267,7 @@ out_3 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.
                        pred = TRUE, eval.real = FALSE, eval.sim = FALSE,
                        dat.part = dat.part, nm.id = nm.id)
 head(out_3$pred_prob$pred.score)
+head(out_3$pred_prob$pred.prob)
 head(out_3$pred_prob$pred.cluster)
 ```
 

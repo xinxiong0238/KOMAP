@@ -614,8 +614,7 @@ gen.KOMAP.est.table.corrupt <- function(input.cov.train, input.cov.valid, nm.dis
 
 #' @import mclust
 KOMAP.pred.corrupt <- function(out, target.code, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id = 'patient_num'){
-  pred.prob = data.frame(`patient_num` = dat.part[,nm.id])
-  pred.cluster = data.frame(`patient_num` = dat.part[,nm.id])
+  pred.cluster = pred.prob = pred.score = data.frame(`patient_num` = dat.part[,nm.id])
   for(i in 1:length(out)){
     method = out[[i]]
     feat = method$beta$feat
@@ -640,21 +639,27 @@ KOMAP.pred.corrupt <- function(out, target.code, dat.part, nm.utl, nm.corrupt.co
 
     ## Fit gaussian mixture model on S.norm, we only use the "length(nm.logS.ori) = 1" case:
     fit = S.norm
-    pred.prob = cbind(pred.prob, fit)
+    pred.score = cbind(pred.score, fit)
     junk = mclust::Mclust(S.norm, G = 2, verbose = FALSE)
     cor1 = cor(dat.part[, target.code], junk$classification, method = 'kendall')
     cor2 = cor(dat.part[, target.code], 3-junk$classification, method = 'kendall')
     # cluster_i = ifelse(cor1 > cor2, junk$classification - 1, 3 - junk$classification)
     if(cor1 > cor2){
       cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease'))
+      prob_i = junk$z[, 2]
     }else{
       cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease'))
+      prob_i = junk$z[, 1]
     }
     pred.cluster = cbind(pred.cluster, cluster_i)
+    pred.prob = cbind(pred.prob, prob_i)
   }
   colnames(pred.prob)[-1] = names(out)
   colnames(pred.cluster)[-1] = names(out)
-  return(list(`pred.score` = stats::na.omit(pred.prob), `pred.cluster` = stats::na.omit(pred.cluster)))
+  colnames(pred.score)[-1] = names(out)
+  return(list(`pred.score` = stats::na.omit(pred.score),
+              `pred.prob` = stats::na.omit(pred.prob),
+              `pred.cluster` = stats::na.omit(pred.cluster)))
 }
 
 
