@@ -257,7 +257,7 @@ out_2$sim_eval
 ```
 
 ### Output regression coefficients and predicted disease scores
-When specifying `pred=TRUE` and input a group of individual data (i.e., log count of EHR features), KOMAP will return both the regression coefficients, predicted disease scores and predicted disease labels (using gaussian mixture model) for the input patients. Remember to specify the `nm.id` argument (unique patient id) to avoid score matching issue.
+When specifying `pred=TRUE` and input a group of individual data (i.e., log count of EHR features), KOMAP will return both the regression coefficients, predicted disease scores, predicted disease probabilities and predicted disease labels (using gaussian mixture model) for the input patients. Remember to specify the `nm.id` argument (unique patient id) to avoid score matching issue.
 ```{r}
 library(mclust)
 out_3 <- KOMAP_corrupt(input.cov.train, input.cov.valid, is.wide = TRUE, target.code, target.cui, 

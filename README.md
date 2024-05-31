@@ -161,14 +161,14 @@ data(filter_df)
 input_cov <- gen_cov_input(ehr_data, rollup_dict, filter_df, main_surrogates = 'PheCode:250', train_ratio = 1/2)
 input_cov$train_cov[1:3,1:3]
 #>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
-#> corrupt_PheCode:250          0.13512741        0.3256309      -0.07477726
-#> LAB-LOINC:1742-6             0.32563092        0.7847075      -0.18019872
-#> LAB-LOINC:1920-8            -0.07477726       -0.1801987       0.04138049
-input_cov$valid_cov[1:3,1:3]
-#>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
 #> corrupt_PheCode:250                   0                0        0.0000000
 #> LAB-LOINC:1742-6                      0                0        0.0000000
 #> LAB-LOINC:1920-8                      0                0        0.4197944
+input_cov$valid_cov[1:3,1:3]
+#>                     corrupt_PheCode:250 LAB-LOINC:1742-6 LAB-LOINC:1920-8
+#> corrupt_PheCode:250          0.13512741        0.3256309      -0.07477726
+#> LAB-LOINC:1742-6             0.32563092        0.7847075      -0.18019872
+#> LAB-LOINC:1920-8            -0.07477726       -0.1801987       0.04138049
 ```
 
 ### Input covariance matrix (long format)
@@ -458,10 +458,10 @@ out_2$sim_eval
 
 When specifying `pred=TRUE` and input a group of individual data (i.e.,
 log count of EHR features), KOMAP will return both the regression
-coefficients, predicted disease scores and predicted disease labels
-(using gaussian mixture model) for the input patients. Remember to
-specify the `nm.id` argument (unique patient id) to avoid score matching
-issue.
+coefficients, predicted disease scores, predicted disease probabilities
+and predicted disease labels (using gaussian mixture model) for the
+input patients. Remember to specify the `nm.id` argument (unique patient
+id) to avoid score matching issue.
 
 ``` r
 library(mclust)
@@ -503,7 +503,13 @@ head(out_3$pred_prob$pred.score)
 #> 13          s5        0.1699729                 0.3269727
 #> 20          s6       -0.8280096                -0.1911863
 head(out_3$pred_prob$pred.prob)
-#> NULL
+#>   patient_num mainICD + codify mainICDNLP + codify & NLP
+#> 1          s1       0.99760586                0.28226168
+#> 2          s2       0.74754562                0.99958303
+#> 3          s3       0.00993598                0.03222794
+#> 4          s4       0.08358144                0.16395525
+#> 5          s5       0.98741992                0.99802343
+#> 6          s6       0.06658879                0.96145942
 head(out_3$pred_prob$pred.cluster)
 #>    patient_num mainICD + codify mainICDNLP + codify & NLP
 #> 3           s1          disease                no disease
