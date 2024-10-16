@@ -86,7 +86,7 @@ KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide
 
   if(pred){
     KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
-    pred.prob = KOMAP.pred.corrupt(out, dat.part, nm.utl, nm.corrupts, nm.multi, nm.id)
+    pred.prob = KOMAP.pred.corrupt(out, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id)
     out_return = c(out_return, `pred_prob` = list(pred.prob))
     message('Finish predicting scores.')
   }
