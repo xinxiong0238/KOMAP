@@ -23,10 +23,10 @@
 #' @importFrom rlang .data
 #' @export
 KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide = TRUE, targets, related.feature,
-                          nm.disease, nm.utl, nm.corrupts,
-                          dict = NULL, pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
-                          mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
-                          dat.part = NULL, nm.id = NULL, nm.pi = NULL, nm.y = NULL){
+                                       nm.disease, nm.utl, nm.corrupts,
+                                       dict = NULL, pred = FALSE, eval.real = FALSE, eval.sim = TRUE,
+                                       mu0 = NULL, mu1 = NULL, var0 = NULL, var1 = NULL, prev_Y = NULL, B = 10000,
+                                       dat.part = NULL, nm.id = NULL, nm.pi = NULL, nm.y = NULL){
   oldw <- getOption("warn")
   options(warn = -1)
   if(!is.wide){
@@ -68,7 +68,7 @@ KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide
     KOMAP.est.check.part_multi_target(input.cov.train, targets, nm.utl)
   }
   out_main = KOMAP.est.corrupt.multi.target(input.cov.train, input.cov.valid, targets, related.feature,
-                               nm.disease, nm.utl, nm.corrupts, dict)
+                                            nm.disease, nm.utl, nm.corrupts, dict)
 
   message('\nFinish estimating coefficients.')
   nm.multi = NULL
@@ -86,7 +86,7 @@ KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide
 
   if(pred){
     KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
-    pred.prob = KOMAP.pred.corrupt(out, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id)
+    pred.prob = KOMAP.pred.corrupt.multi(out, targets, dat.part, nm.utl, nm.corrupts, nm.multi, nm.id)
     out_return = c(out_return, `pred_prob` = list(pred.prob))
     message('Finish predicting scores.')
   }
@@ -102,7 +102,7 @@ KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide
       message('Finish evaluating model prediction.')
     }else{
       KOMAP.pred.check(out, feat.out, dat.part, nm.utl, nm.id)
-      pred.prob = KOMAP.pred.corrupt(out, dat.part, nm.utl, nm.corrupt.code, nm.corrupt.cui, nm.multi, nm.id)
+      pred.prob = KOMAP.pred.corrupt.multi(out, targets, dat.part, nm.utl, nm.corrupts, nm.multi, nm.id)
       gold.label = dat.part[,c(nm.id, nm.y, nm.pi)]
       gold.label = stats::na.omit(gold.label)
       KOMAP.eval.check(pred.prob, gold.label, nm.pi, nm.y, nm.id, method_nm)
@@ -118,7 +118,7 @@ KOMAP_corrupt_multi_target <- function(input.cov.train, input.cov.valid, is.wide
 
 
 KOMAP.est.corrupt.multi.target <- function(input.cov.train, input.cov.valid, targets, related.feature,
-                              nm.disease, nm.utl, nm.corrupts, dict){
+                                           nm.disease, nm.utl, nm.corrupts, dict){
   out.all = c()
   for(target in targets){
     if(str_detect(target, '^PheCode\\:')){
@@ -318,5 +318,97 @@ gen.KOMAP.est.table.corrupt.multi.target <- function(input.cov.train, input.cov.
   }
   return(out)
 }
+
+#' @import mclust
+KOMAP.pred.corrupt.multi <- function(out, targets, dat.part, nm.utl,
+                                     nm.corrupts, nm.multi, nm.id = 'patient_num'){
+  pred.cluster = pred.prob = pred.score = data.frame(`patient_num` = dat.part[,nm.id])
+  for(i in 1:length(out)){
+    method = out[[i]]
+    feat = method$beta$feat
+    # feat = setdiff(feat, c(nm.corrupt.code, nm.corrupt.cui))
+    # print(setdiff(feat,  colnames(dat.part)))
+    feat = intersect(feat, colnames(dat.part))
+    if(length(feat) == 1){
+      dat.part.filter = data.frame(dat.part[, feat])
+      colnames(dat.part.filter) = feat
+    }else{
+      dat.part.filter = dat.part[, feat]
+    }
+    dat.part.filter = as.data.frame(cbind(dat.part[,nm.utl], dat.part.filter))
+    colnames(dat.part.filter)[1] = nm.utl
+    if(!is.null(nm.multi)){
+      dat.part.filter = as.data.frame(cbind(dat.part[,nm.multi], dat.part.filter))
+      colnames(dat.part.filter)[1] = nm.multi
+    }
+    b.all = data.frame(`coeff` = method$beta$theta, `feat` = method$beta$feat)
+    b.all = b.all[b.all$feat %in% feat, ]
+    S.norm <- as.matrix(dat.part.filter[,b.all$feat]) %*% matrix(b.all$coeff, ncol=1)
+
+    ## Fit gaussian mixture model on S.norm, we only use the "length(nm.logS.ori) = 1" case:
+    fit = S.norm
+    pred.score = cbind(pred.score, fit)
+    junk = mclust::Mclust(S.norm, G = 2, verbose = FALSE)
+    cor1 = cor(dat.part[, targets[1]], junk$classification, method = 'kendall')
+    cor2 = cor(dat.part[, targets[1]], 3-junk$classification, method = 'kendall')
+    # cluster_i = ifelse(cor1 > cor2, junk$classification - 1, 3 - junk$classification)
+    if(cor1 > cor2){
+      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('no disease', 'disease'))
+      prob_i = junk$z[, 2]
+    }else{
+      cluster_i = factor(junk$classification, levels = c(1, 2), labels = c('disease', 'no disease'))
+      prob_i = junk$z[, 1]
+    }
+    pred.cluster = cbind(pred.cluster, cluster_i)
+    pred.prob = cbind(pred.prob, prob_i)
+  }
+  colnames(pred.prob)[-1] = names(out)
+  colnames(pred.cluster)[-1] = names(out)
+  colnames(pred.score)[-1] = names(out)
+  return(list(`pred.score` = stats::na.omit(pred.score),
+              `pred.prob` = stats::na.omit(pred.prob),
+              `pred.cluster` = stats::na.omit(pred.cluster)))
+}
+
+
+
+KOMAP.eval <- function(pred.prob, gold.label, nm.pi = NULL, nm.y = 'Y', nm.id, method_nm){
+  dat.merge = dplyr::left_join(gold.label, pred.prob$pred.score, by = nm.id)
+  dat.merge = stats::na.omit(dat.merge)
+  Y <- dat.merge[, nm.y]
+  auc_table <- c()
+  F_table <- c()
+  prev_vec <- c()
+  label_num_vec <- c()
+  # Since the sampling of gold label set is not completely at random, we need to include weights:
+  if(!is.null(nm.pi)){
+    w <- 1 / dat.merge[,nm.pi]
+  }else{
+    dat.merge$pi = w <- rep(1/nrow(dat.merge), nrow(dat.merge))
+  }
+  prev_vec <- c(prev_vec, mean(Y))
+  label_num_vec <- c(label_num_vec, length(Y))
+  num_method <- length(method_nm)
+  auc_vec <- rep(0, num_method)
+  F_vec <- rep(0, num_method)
+  roc_lst <- vector('list', num_method)
+
+  for (t in 1:num_method){
+    # AUC
+    auc_vec[t] <- AUC(Y, as.vector(dat.merge[,method_nm[t]]), wgt=w)
+    # ROC table
+    roc_lst[[t]] <- ROC(Y, as.vector(dat.merge[,method_nm[t]]), wgti=w, seq = seq(.01,.99,by=1e-5))[-1,]
+    # Maximum F-score
+    F_score_all <- 2 / (1 / roc_lst[[t]][,4] + 1 / roc_lst[[t]][,5])
+    F_vec[t] <- max(F_score_all)
+  }
+  return(data.frame(`method` = method_nm,
+                    `auc` = auc_vec,
+                    `F_score_max` = F_vec)
+         # `F_score_max` = F_vec
+  )
+}
+
+
 
 
